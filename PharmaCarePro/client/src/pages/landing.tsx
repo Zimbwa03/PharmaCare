@@ -18,7 +18,7 @@ export default function Landing() {
             </div>
           </div>
           <Button asChild data-testid="button-login">
-            <a href="/api/login">Log In</a>
+            <a href="/login">Log In</a>
           </Button>
         </div>
       </header>
@@ -33,7 +33,7 @@ export default function Landing() {
             intelligent inventory management, and real-time drug interaction checking.
           </p>
           <Button size="lg" asChild data-testid="button-get-started">
-            <a href="/api/login">Get Started</a>
+            <a href="/login">Get Started</a>
           </Button>
         </div>
 
@@ -118,7 +118,7 @@ export default function Landing() {
               Join pharmacies across Zimbabwe using Pharma Care for efficient, compliant operations
             </CardDescription>
             <Button size="lg" variant="secondary" asChild data-testid="button-start-now">
-              <a href="/api/login">Start Now</a>
+              <a href="/login">Start Now</a>
             </Button>
           </CardHeader>
         </Card>

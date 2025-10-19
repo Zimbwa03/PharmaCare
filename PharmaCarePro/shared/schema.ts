@@ -28,15 +28,20 @@ export const sessions = pgTable(
 // User roles enum
 export const userRoleEnum = pgEnum('user_role', ['administrator', 'pharmacist', 'receptionist', 'technician', 'store_manager']);
 
-// User storage table - Required for Replit Auth with roles
+// User storage table - Custom email/password authentication
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
+  email: varchar("email").unique().notNull(),
+  password: varchar("password").notNull(),
+  firstName: varchar("first_name").notNull(),
+  lastName: varchar("last_name").notNull(),
+  phoneNumber: varchar("phone_number"),
+  pharmacyBranch: varchar("pharmacy_branch"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default('receptionist'),
   isActive: boolean("is_active").notNull().default(true),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  verificationToken: varchar("verification_token"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

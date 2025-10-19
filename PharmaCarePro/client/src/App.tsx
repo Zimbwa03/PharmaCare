@@ -10,6 +10,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
+import Login from "@/pages/login";
+import CreateAdmin from "@/pages/create-admin";
 import Dashboard from "@/pages/dashboard";
 import Patients from "@/pages/patients";
 import Prescriptions from "@/pages/prescriptions";
@@ -32,11 +34,15 @@ import {
 import { LogOut, User } from "lucide-react";
 
 function Router() {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
 
-  // Referenced from javascript_log_in_with_replit blueprint
   return (
     <Switch>
+      {/* Public routes - accessible to everyone */}
+      <Route path="/login" component={Login} />
+      <Route path="/create-admin" component={CreateAdmin} />
+
+      {/* Protected routes - require authentication */}
       {isLoading || !isAuthenticated ? (
         <Route path="/" component={Landing} />
       ) : (
@@ -106,10 +112,17 @@ function AppContent() {
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <a href="/api/logout" className="cursor-pointer" data-testid="button-logout">
+                        <button
+                          onClick={async () => {
+                            await fetch("/api/auth/logout", { method: "POST" });
+                            window.location.href = "/login";
+                          }}
+                          className="cursor-pointer w-full"
+                          data-testid="button-logout"
+                        >
                           <LogOut className="mr-2 h-4 w-4" />
                           <span>Log out</span>
-                        </a>
+                        </button>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

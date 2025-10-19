@@ -1,8 +1,8 @@
-// Referenced from javascript_log_in_with_replit blueprint
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, requireRole } from "./replitAuth";
+import { requireAuth, requireRole } from "./auth";
+import authRoutes from "./authRoutes";
 import { insertPatientSchema, insertProductSchema, insertStockMovementSchema } from "@shared/schema";
 import { checkDrugInteractions, forecastDemand } from "./ai-services";
 
@@ -22,23 +22,11 @@ async function auditLog(userId: string, action: string, entityType: string, enti
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Referenced from javascript_log_in_with_replit blueprint - Auth middleware
-  await setupAuth(app);
-
-  // Auth routes - Referenced from javascript_log_in_with_replit blueprint
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  // Custom authentication routes
+  app.use('/api/auth', authRoutes);
 
   // Dashboard stats
-  app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
+  app.get("/api/dashboard/stats", requireAuth(), async (req, res) => {
     try {
       const patients = await storage.getAllPatients();
       const prescriptions = await storage.getAllPrescriptions();
@@ -74,7 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Patients routes
-  app.get("/api/patients", isAuthenticated, requireRole("Administrator", "Pharmacist", "Technician"), async (req: any, res) => {
+  app.get("/api/patients", requireAuth(), requireRole("Administrator", "Pharmacist", "Technician"), async (req: any, res) => {
     try {
       const patients = await storage.getAllPatients();
       res.json(patients);
@@ -83,7 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/patients", isAuthenticated, requireRole("Administrator", "Pharmacist"), async (req: any, res) => {
+  app.post("/api/patients", requireAuth(), requireRole("Administrator", "Pharmacist"), async (req: any, res) => {
     try {
       const validated = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(validated);
@@ -99,7 +87,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Products routes
-  app.get("/api/products", isAuthenticated, async (req, res) => {
+  app.get("/api/products", requireAuth(), async (req, res) => {
     try {
       const products = await storage.getAllProducts();
       res.json(products);
@@ -108,7 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/products", isAuthenticated, requireRole("Administrator", "Store Manager"), async (req: any, res) => {
+  app.post("/api/products", requireAuth(), requireRole("Administrator", "Store Manager"), async (req: any, res) => {
     try {
       const validated = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(validated);
@@ -125,7 +113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory routes
-  app.get("/api/inventory", isAuthenticated, async (req, res) => {
+  app.get("/api/inventory", requireAuth(), async (req, res) => {
     try {
       const inventory = await storage.getAllInventory();
       res.json(inventory);
@@ -135,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Prescriptions routes
-  app.get("/api/prescriptions", isAuthenticated, async (req, res) => {
+  app.get("/api/prescriptions", requireAuth(), async (req, res) => {
     try {
       const prescriptions = await storage.getAllPrescriptions();
       res.json(prescriptions);
@@ -144,7 +132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/prescriptions", isAuthenticated, requireRole("Administrator", "Pharmacist"), async (req: any, res) => {
+  app.post("/api/prescriptions", requireAuth(), requireRole("Administrator", "Pharmacist"), async (req: any, res) => {
     try {
       const { patientId, prescriberName, prescriberId, notes, items } = req.body;
 
@@ -240,7 +228,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/prescriptions/check-interactions", isAuthenticated, async (req, res) => {
+  app.post("/api/prescriptions/check-interactions", requireAuth(), async (req, res) => {
     try {
       const { patientId, productIds } = req.body;
 
@@ -261,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stock movements routes
-  app.post("/api/stock-movements", isAuthenticated, requireRole("Administrator", "Store Manager", "Technician"), async (req: any, res) => {
+  app.post("/api/stock-movements", requireAuth(), requireRole("Administrator", "Store Manager", "Technician"), async (req: any, res) => {
     try {
       const validated = insertStockMovementSchema.parse(req.body);
       
@@ -287,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Suppliers routes
-  app.get("/api/suppliers", isAuthenticated, async (req, res) => {
+  app.get("/api/suppliers", requireAuth(), async (req, res) => {
     try {
       const suppliers = await storage.getAllSuppliers();
       res.json(suppliers);
@@ -297,7 +285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manufacturers routes
-  app.get("/api/manufacturers", isAuthenticated, async (req, res) => {
+  app.get("/api/manufacturers", requireAuth(), async (req, res) => {
     try {
       const manufacturers = await storage.getAllManufacturers();
       res.json(manufacturers);
@@ -307,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users routes
-  app.get("/api/users", isAuthenticated, requireRole("Administrator"), async (req, res) => {
+  app.get("/api/users", requireAuth(), requireRole("Administrator"), async (req, res) => {
     try {
       const users = await storage.getAllUsers();
       res.json(users);
@@ -317,7 +305,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Audit logs routes
-  app.get("/api/audit-logs", isAuthenticated, requireRole("Administrator", "Pharmacist"), async (req, res) => {
+  app.get("/api/audit-logs", requireAuth(), requireRole("Administrator", "Pharmacist"), async (req, res) => {
     try {
       const { userId, action, entityType } = req.query;
       const logs = await storage.getAuditLogs({
@@ -332,7 +320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // AI-powered analytics
-  app.get("/api/analytics/forecast", isAuthenticated, requireRole("Administrator", "Store Manager"), async (req, res) => {
+  app.get("/api/analytics/forecast", requireAuth(), requireRole("Administrator", "Store Manager"), async (req, res) => {
     try {
       const products = await storage.getAllProducts();
       const inventory = await storage.getAllInventory();
