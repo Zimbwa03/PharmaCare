@@ -116,12 +116,12 @@ export default function ReceptionistPOS() {
     },
   });
 
-  // Search products for OTC sales
+  // Search products for OTC sales (STRICT: receptionist-only endpoint)
   const { data: products = [], isLoading: isSearching } = useQuery<Product[]>({
-    queryKey: ["/api/products/search", searchQuery],
+    queryKey: ["/api/receptionist/products/search", searchQuery],
     queryFn: async () => {
       if (!searchQuery || searchQuery.length < 2) return [];
-      const response = await fetch(`/api/products/search?q=${encodeURIComponent(searchQuery)}`);
+      const response = await fetch(`/api/receptionist/products/search?q=${encodeURIComponent(searchQuery)}`);
       if (!response.ok) throw new Error("Failed to search products");
       return response.json();
     },
