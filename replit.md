@@ -44,11 +44,11 @@ The system follows a monorepo architecture with clear separation between fronten
 
 **API Design**: RESTful API with JSON request/response format
 
-**Authentication**: Replit Auth (OIDC-based) for user authentication with role-based access control (Administrator, Pharmacist, Technician, Store Manager)
+**Authentication**: Custom email/password authentication with bcrypt for secure password hashing
 
-**Session Management**: PostgreSQL-backed sessions using connect-pg-simple for persistent session storage
+**Session Management**: Memory-based sessions using express-session with memorystore (development)
 
-**Rationale**: Express provides a minimal, flexible foundation. Drizzle ORM offers excellent TypeScript integration and performance while staying close to SQL. Replit Auth simplifies authentication setup while providing enterprise-grade security.
+**Rationale**: Express provides a minimal, flexible foundation. Drizzle ORM offers excellent TypeScript integration and performance while staying close to SQL. Custom authentication provides full control over user management and security.
 
 ### Data Storage
 
@@ -85,23 +85,29 @@ The system follows a monorepo architecture with clear separation between fronten
 
 ### Authentication & Authorization
 
-**Authentication Provider**: Replit Auth (OIDC)
+**Authentication Provider**: Custom email/password authentication with bcrypt password hashing
 
-**Session Storage**: PostgreSQL with automatic session cleanup
+**Session Storage**: Memory-based sessions using express-session with memorystore (development), upgradable to PostgreSQL-backed sessions for production
 
-**Authorization Model**: Role-based access control with four role levels:
-- Administrator (full system access)
-- Pharmacist (clinical operations)
-- Technician (dispensing operations)
-- Store Manager (inventory and reporting)
+**Authorization Model**: Role-based access control with three role levels:
+- Administrator (full system access + user management)
+- Pharmacist (clinical operations + prescriptions)
+- Receptionist (patient registration + basic operations)
+
+**User Registration**:
+- First admin created via `/create-admin` signup page (email, password, phone, pharmacy branch)
+- Additional users (Pharmacist, Receptionist) created by Administrators through Settings
+- Email verification system with verification tokens (placeholder implementation)
 
 **Security Features**:
+- bcrypt password hashing with salt rounds
 - HTTPS-only cookies with httpOnly flag
 - Session expiration (7-day TTL)
-- CSRF protection via session tokens
+- Protected routes with `requireAuth()` and `requireRole()` middleware
+- Both `req.user` and `req.dbUser` set for compatibility with existing routes
 - Audit logging of all critical operations
 
-**Rationale**: Replit Auth provides production-ready authentication without managing user credentials. Database-backed sessions ensure session persistence across server restarts. Role-based access ensures proper separation of duties for regulatory compliance.
+**Rationale**: Custom authentication provides full control over user management and eliminates third-party dependencies. bcrypt ensures secure password storage. Memory-based sessions work well for development and can be upgraded to PostgreSQL-backed sessions for production scalability. Role-based access ensures proper separation of duties for regulatory compliance.
 
 ### Type Safety & Validation
 
@@ -127,11 +133,9 @@ The system follows a monorepo architecture with clear separation between fronten
 
 **Environment Variables Required**:
 - `DATABASE_URL` - PostgreSQL connection string
-- `SESSION_SECRET` - Session encryption key
+- `SESSION_SECRET` - Session encryption key (required for secure session management)
 - `DEEPSEEK_API_KEY` - Optional AI service key
 - `GEMINI_API_KEY` - Optional AI service key
-- `REPL_ID` - Replit workspace identifier
-- `ISSUER_URL` - OIDC issuer URL (defaults to Replit)
 
 **Rationale**: This setup optimizes for development speed while producing an efficient production bundle. The single-server architecture simplifies deployment and reduces infrastructure complexity.
 
@@ -140,12 +144,8 @@ The system follows a monorepo architecture with clear separation between fronten
 ### Third-Party Services
 
 **Supabase**: PostgreSQL database hosting and management
-- Used for: Primary data storage, session storage
+- Used for: Primary data storage
 - Connection: Standard PostgreSQL connection string via `DATABASE_URL`
-
-**Replit Auth**: OAuth/OIDC authentication provider
-- Used for: User authentication and identity management
-- Configuration: Via `REPL_ID` and `ISSUER_URL` environment variables
 
 **DeepSeek API**: AI service for drug interaction analysis (planned integration)
 - Used for: Advanced drug interaction checking and clinical decision support
