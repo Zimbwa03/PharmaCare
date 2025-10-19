@@ -604,4 +604,75 @@ router.post('/quotations/:id/convert', requireAuth(), requireRole('receptionist'
   }
 });
 
+// GET /api/receptionist/sales/search - Search for sales to return
+router.get('/sales/search', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { query } = req.query;
+
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ message: 'Search query is required' });
+    }
+
+    // Search by sale number or patient name
+    const sales = await storage.searchSales(query.toString());
+
+    res.json(sales);
+  } catch (error) {
+    console.error('Search sales error:', error);
+    res.status(500).json({ message: 'Error searching sales' });
+  }
+});
+
+// GET /api/receptionist/sales/:id - Get sale details for return processing
+router.get('/sales/:id', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const sale = await storage.getSaleWithDetails(id);
+
+    if (!sale) {
+      return res.status(404).json({ message: 'Sale not found' });
+    }
+
+    res.json(sale);
+  } catch (error) {
+    console.error('Get sale details error:', error);
+    res.status(500).json({ message: 'Error fetching sale details' });
+  }
+});
+
+// POST /api/receptionist/returns - Process a return/refund
+router.post('/returns', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { saleId, items, reason, refundMethod } = req.body;
+
+    if (!saleId || !items || items.length === 0) {
+      return res.status(400).json({ message: 'Sale ID and items are required' });
+    }
+
+    if (!refundMethod) {
+      return res.status(400).json({ message: 'Refund method is required' });
+    }
+
+    const userId = (req as any).dbUser?.id || (req as any).user?.id;
+
+    const returnRecord = await storage.processReturn({
+      saleId,
+      items,
+      reason,
+      refundMethod,
+      returnedBy: userId,
+    });
+
+    res.json({
+      success: true,
+      message: 'Return processed successfully',
+      return: returnRecord,
+    });
+  } catch (error) {
+    console.error('Process return error:', error);
+    res.status(500).json({ message: error instanceof Error ? error.message : 'Error processing return' });
+  }
+});
+
 export default router;

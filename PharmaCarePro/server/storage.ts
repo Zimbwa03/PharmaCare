@@ -1,4 +1,4 @@
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, or, like, ilike } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -11,6 +11,11 @@ import {
   suppliers,
   manufacturers,
   auditLogs,
+  sales,
+  saleItems,
+  returns,
+  returnItems,
+  shifts,
   type User,
   type UpsertUser,
   type Patient,
@@ -30,7 +35,6 @@ import {
   type Manufacturer,
   type InsertManufacturer,
   type AuditLog,
-  type InsertAuditLog,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -79,8 +83,13 @@ export interface IStorage {
   createManufacturer(manufacturer: InsertManufacturer): Promise<Manufacturer>;
 
   // Audit Logs
-  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
-  getAuditLogs(filters?: { userId?: string; action?: string; entityType?: string }): Promise<AuditLog[]>;
+  createAuditLog(log: Partial<typeof auditLogs.$inferInsert>): Promise<AuditLog>;
+  getAuditLogs(filters?: { userId?: string; action?: string; entity?: string }): Promise<AuditLog[]>;
+  
+  // Sales and Returns
+  searchSales(query: string): Promise<any[]>;
+  getSaleWithDetails(id: string): Promise<any>;
+  processReturn(data: { saleId: string; items: any[]; reason?: string; refundMethod: string; returnedBy: string }): Promise<any>;
 }
 
 class DatabaseStorage implements IStorage {
@@ -295,12 +304,12 @@ class DatabaseStorage implements IStorage {
   }
 
   // Audit Logs
-  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
-    const [created] = await db.insert(auditLogs).values(log).returning();
+  async createAuditLog(log: Partial<typeof auditLogs.$inferInsert>): Promise<AuditLog> {
+    const [created] = await db.insert(auditLogs).values(log as any).returning();
     return created;
   }
 
-  async getAuditLogs(filters?: { userId?: string; action?: string; entityType?: string }): Promise<AuditLog[]> {
+  async getAuditLogs(filters?: { userId?: string; action?: string; entity?: string }): Promise<AuditLog[]> {
     let query = db.select().from(auditLogs);
     
     const conditions = [];
@@ -308,17 +317,186 @@ class DatabaseStorage implements IStorage {
       conditions.push(eq(auditLogs.userId, filters.userId));
     }
     if (filters?.action) {
-      conditions.push(eq(auditLogs.action, filters.action));
+      conditions.push(eq(auditLogs.action, filters.action as any));
     }
-    if (filters?.entityType) {
-      conditions.push(eq(auditLogs.entityType, filters.entityType));
+    if (filters?.entity) {
+      conditions.push(eq(auditLogs.entity, filters.entity));
     }
     
     if (conditions.length > 0) {
       query = query.where(and(...conditions)) as any;
     }
     
-    return query.orderBy(desc(auditLogs.timestamp));
+    return query.orderBy(desc(auditLogs.createdAt));
+  }
+
+  // Sales and Returns
+  async searchSales(query: string): Promise<any[]> {
+    // Search sales by sale number or patient name
+    const results = await db
+      .select({
+        id: sales.id,
+        saleNumber: sales.saleNumber,
+        saleType: sales.saleType,
+        totalAmount: sales.totalAmount,
+        status: sales.status,
+        createdAt: sales.createdAt,
+        patientId: patients.id,
+        patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+        patientPhone: patients.phone,
+      })
+      .from(sales)
+      .leftJoin(patients, eq(sales.patientId, patients.id))
+      .where(
+        or(
+          ilike(sales.saleNumber, `%${query}%`),
+          ilike(patients.firstName, `%${query}%`),
+          ilike(patients.lastName, `%${query}%`)
+        )
+      )
+      .orderBy(desc(sales.createdAt))
+      .limit(20);
+
+    return results;
+  }
+
+  async getSaleWithDetails(id: string): Promise<any> {
+    // Get sale with items and patient details
+    const [sale] = await db
+      .select({
+        id: sales.id,
+        saleNumber: sales.saleNumber,
+        saleType: sales.saleType,
+        subtotal: sales.subtotal,
+        vatAmount: sales.vatAmount,
+        discount: sales.discount,
+        totalAmount: sales.totalAmount,
+        amountPaid: sales.amountPaid,
+        change: sales.change,
+        status: sales.status,
+        createdAt: sales.createdAt,
+        shiftId: sales.shiftId,
+        patientId: patients.id,
+        patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+        patientPhone: patients.phone,
+      })
+      .from(sales)
+      .leftJoin(patients, eq(sales.patientId, patients.id))
+      .where(eq(sales.id, id))
+      .limit(1);
+
+    if (!sale) {
+      return null;
+    }
+
+    // Get sale items with product details
+    const items = await db
+      .select({
+        id: saleItems.id,
+        productId: saleItems.productId,
+        productName: products.name,
+        quantity: saleItems.quantity,
+        unitPrice: saleItems.unitPrice,
+        discount: saleItems.discount,
+        vatAmount: saleItems.vatAmount,
+        totalPrice: saleItems.totalPrice,
+        batchNumber: saleItems.batchNumber,
+        expiryDate: saleItems.expiryDate,
+        instructions: saleItems.instructions,
+      })
+      .from(saleItems)
+      .leftJoin(products, eq(saleItems.productId, products.id))
+      .where(eq(saleItems.saleId, id));
+
+    return { ...sale, items };
+  }
+
+  async processReturn(data: { 
+    saleId: string; 
+    items: any[]; 
+    reason?: string; 
+    refundMethod: string; 
+    returnedBy: string;
+  }): Promise<any> {
+    // Validate sale exists and is not already fully refunded
+    const [sale] = await db
+      .select()
+      .from(sales)
+      .where(eq(sales.id, data.saleId))
+      .limit(1);
+
+    if (!sale) {
+      throw new Error('Sale not found');
+    }
+
+    if (sale.status === 'refunded') {
+      throw new Error('This sale has already been fully refunded');
+    }
+
+    // Calculate total return amount
+    let totalReturnAmount = 0;
+    for (const item of data.items) {
+      totalReturnAmount += parseFloat(item.unitPrice) * item.quantityReturned;
+    }
+
+    // Generate return number
+    const returnNumber = `RET-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+
+    // Create return record
+    const [returnRecord] = await db
+      .insert(returns)
+      .values({
+        returnNumber,
+        saleId: data.saleId,
+        customerId: sale.patientId || null,
+        returnedBy: data.returnedBy,
+        status: 'completed',
+        reason: data.reason || null,
+        totalAmount: totalReturnAmount.toFixed(2),
+        refundAmount: totalReturnAmount.toFixed(2),
+        refundMethod: data.refundMethod as any,
+      })
+      .returning();
+
+    // Create return items and update inventory
+    for (const item of data.items) {
+      // Create return item
+      await db.insert(returnItems).values({
+        returnId: returnRecord.id,
+        saleItemId: item.saleItemId,
+        productId: item.productId,
+        quantityReturned: item.quantityReturned,
+        unitPrice: item.unitPrice,
+        totalPrice: (parseFloat(item.unitPrice) * item.quantityReturned).toFixed(2),
+        reason: item.reason || data.reason || null,
+      });
+
+      // Update inventory - add returned quantity back to stock
+      await db.execute(sql`
+        UPDATE inventory
+        SET quantity = quantity + ${item.quantityReturned}
+        WHERE product_id = ${item.productId}
+      `);
+    }
+
+    // Update sale status
+    const newStatus = totalReturnAmount >= parseFloat(sale.totalAmount) ? 'refunded' : 'partially_refunded';
+    await db
+      .update(sales)
+      .set({ status: newStatus as any })
+      .where(eq(sales.id, data.saleId));
+
+    // Update shift if sale was linked to a shift
+    if (sale.shiftId && data.refundMethod === 'cash') {
+      await db.execute(sql`
+        UPDATE shifts
+        SET total_cash_sales = total_cash_sales - ${totalReturnAmount},
+            total_sales = total_sales - ${totalReturnAmount}
+        WHERE id = ${sale.shiftId} AND status = 'open'
+      `);
+    }
+
+    return returnRecord;
   }
 }
 
