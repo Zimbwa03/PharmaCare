@@ -57,14 +57,8 @@ export default function Login() {
         return;
       }
 
-      // Login successful - redirect based on user role immediately
-      if (result.user?.role === 'receptionist') {
-        window.location.href = "/receptionist-pos";
-      } else if (result.user?.role === 'administrator') {
-        window.location.href = "/admin-dashboard";
-      } else {
-        window.location.href = "/";
-      }
+      // Login successful - redirect to home and let router handle role-based routing
+      window.location.href = "/";
       // Don't set isLoading to false - we're redirecting
     } catch (err) {
       setError("Network error. Please try again.");
