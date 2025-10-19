@@ -54,6 +54,7 @@ router.post('/signup', async (req: Request, res: Response) => {
     const verificationToken = generateVerificationToken();
 
     // Create admin user (first user is always administrator)
+    // Auto-verify for now until email service is set up
     const user = await storage.createUser({
       email: data.email,
       password: hashedPassword,
@@ -62,19 +63,13 @@ router.post('/signup', async (req: Request, res: Response) => {
       phoneNumber: data.phoneNumber,
       pharmacyBranch: data.pharmacyBranch,
       role: 'administrator',
-      emailVerified: false,
-      verificationToken,
+      emailVerified: true, // Auto-verify in development
+      verificationToken: null,
       isActive: true,
     });
 
-    // In production, send verification email here
-    // For now, log the verification link
-    console.log(`\n\n📧 EMAIL VERIFICATION LINK (Development Mode):`);
-    console.log(`http://localhost:5000/api/auth/verify-email?token=${verificationToken}`);
-    console.log(`\n\n`);
-
     res.status(201).json({
-      message: "Admin account created successfully. Check console for email verification link.",
+      message: "Admin account created successfully. You can now log in.",
       userId: user.id,
       email: user.email,
     });
@@ -249,7 +244,7 @@ router.post('/create-user', async (req: Request, res: Response) => {
     const hashedPassword = await hashPassword(data.password);
     const verificationToken = generateVerificationToken();
 
-    // Create user
+    // Create user (auto-verify in development until email service is set up)
     const user = await storage.createUser({
       email: data.email,
       password: hashedPassword,
@@ -258,20 +253,13 @@ router.post('/create-user', async (req: Request, res: Response) => {
       phoneNumber: data.phoneNumber,
       pharmacyBranch: data.pharmacyBranch,
       role: data.role,
-      emailVerified: false,
-      verificationToken,
+      emailVerified: true, // Auto-verify in development
+      verificationToken: null,
       isActive: true,
     });
 
-    // In production, send verification email here
-    console.log(`\n\n📧 NEW USER EMAIL VERIFICATION LINK (Development Mode):`);
-    console.log(`Email: ${user.email}`);
-    console.log(`Role: ${user.role}`);
-    console.log(`http://localhost:5000/api/auth/verify-email?token=${verificationToken}`);
-    console.log(`\n\n`);
-
     res.status(201).json({
-      message: "User account created successfully. Verification email sent.",
+      message: "User account created successfully. They can now log in.",
       userId: user.id,
       email: user.email,
       role: user.role,
