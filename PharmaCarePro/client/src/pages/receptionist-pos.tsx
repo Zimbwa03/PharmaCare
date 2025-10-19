@@ -122,6 +122,10 @@ export default function ReceptionistPOS() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
   const [showPatientDialog, setShowPatientDialog] = useState(false);
   const [patientSearchQuery, setPatientSearchQuery] = useState("");
+  const [showQuotationDialog, setShowQuotationDialog] = useState(false);
+  const [quotationCart, setQuotationCart] = useState<CartItem[]>([]);
+  const [quotationNotes, setQuotationNotes] = useState("");
+  const [quotationValidDays, setQuotationValidDays] = useState(7);
 
   // Fetch pending prescriptions
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
@@ -143,6 +147,16 @@ export default function ReceptionistPOS() {
       return response.json();
     },
     enabled: patientSearchQuery.length >= 2,
+  });
+
+  // Fetch quotations
+  const { data: quotations = [] } = useQuery({
+    queryKey: ["/api/receptionist/quotations"],
+    queryFn: async () => {
+      const response = await fetch("/api/receptionist/quotations");
+      if (!response.ok) throw new Error("Failed to fetch quotations");
+      return response.json();
+    },
   });
 
   // Search products for OTC sales (STRICT: receptionist-only endpoint)
@@ -174,11 +188,41 @@ export default function ReceptionistPOS() {
         description: "Transaction processed successfully!",
       });
       setCart([]);
+      setSelectedPatient(null);
       setShowPayment(false);
       setAmountReceived("");
-      setCustomerName("");
-      setCustomerPhone("");
       queryClient.invalidateQueries({ queryKey: ["/api/receptionist/prescriptions/pending"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create quotation mutation
+  const createQuotationMutation = useMutation({
+    mutationFn: async (quotationData: any) => {
+      const response = await fetch("/api/receptionist/quotations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(quotationData),
+      });
+      if (!response.ok) throw new Error("Failed to create quotation");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Quotation Created",
+        description: `Quotation ${data.quotation.quotationNumber} created successfully!`,
+      });
+      setQuotationCart([]);
+      setQuotationNotes("");
+      setQuotationValidDays(7);
+      setShowQuotationDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/receptionist/quotations"] });
     },
     onError: (error: Error) => {
       toast({
@@ -373,16 +417,16 @@ export default function ReceptionistPOS() {
                   <Calculator className="h-4 w-4 mr-2" />
                   Calculator (F11)
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => setSelectedTab("quotations")}>
                   <FileText className="h-4 w-4 mr-2" />
-                  Quotation (F9)
+                  Quotations (F9)
                 </Button>
               </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4">
             <Tabs value={selectedTab} onValueChange={setSelectedTab} className="h-full">
-              <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsList className="grid w-full grid-cols-4 mb-4">
                 <TabsTrigger value="prescription" className="flex items-center gap-2">
                   <Receipt className="h-4 w-4" />
                   Prescriptions (F1)
@@ -390,6 +434,10 @@ export default function ReceptionistPOS() {
                 <TabsTrigger value="otc" className="flex items-center gap-2">
                   <Search className="h-4 w-4" />
                   OTC Search (F2)
+                </TabsTrigger>
+                <TabsTrigger value="quotations" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Quotations (F9)
                 </TabsTrigger>
                 <TabsTrigger value="shortcode" className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
@@ -481,6 +529,88 @@ export default function ReceptionistPOS() {
                         </CardContent>
                       </Card>
                     ))}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="quotations" className="mt-0 h-[calc(100vh-20rem)] overflow-auto">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Quotations Management</h3>
+                    <Button onClick={() => setShowQuotationDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Quotation
+                    </Button>
+                  </div>
+
+                  <div className="flex gap-2 mb-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search quotations by patient name or number..."
+                        className="pl-10"
+                      />
+                    </div>
+                    <Select defaultValue="all">
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="converted">Converted</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    {quotations.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No quotations found</p>
+                        <p className="text-sm mt-2">Create a quotation to get started</p>
+                      </div>
+                    ) : (
+                      quotations.map((quotation: any) => (
+                        <Card key={quotation.id} className="cursor-pointer hover:bg-accent transition-colors">
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div className="flex-1">
+                                <p className="font-semibold">{quotation.quotationNumber}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Patient: {quotation.patientName}
+                                </p>
+                                <div className="flex gap-2 mt-1">
+                                  <Badge variant={quotation.status === 'pending' ? 'default' : quotation.status === 'converted' ? 'secondary' : 'destructive'}>
+                                    {quotation.status}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    Valid until {new Date(quotation.validUntil).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-lg">${parseFloat(quotation.totalAmount).toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">{quotation.items} item(s)</p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 mt-3">
+                              <Button variant="outline" size="sm" className="flex-1">
+                                <FileText className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                              {quotation.status === 'pending' && (
+                                <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700">
+                                  <ShoppingCart className="h-3 w-3 mr-1" />
+                                  Convert to Sale
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </div>
                 </div>
               </TabsContent>
@@ -905,6 +1035,258 @@ export default function ReceptionistPOS() {
               </div>
             </TabsContent>
           </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Quotation Dialog */}
+      <Dialog open={showQuotationDialog} onOpenChange={setShowQuotationDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Quotation</DialogTitle>
+            <DialogDescription>
+              Create a price quotation for a patient
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Patient Selection */}
+            {selectedPatient ? (
+              <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">
+                        Patient: {selectedPatient.firstName} {selectedPatient.lastName}
+                      </p>
+                      {selectedPatient.phone && (
+                        <p className="text-xs text-muted-foreground">📞 {selectedPatient.phone}</p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedPatient(null)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setShowQuotationDialog(false);
+                  setShowPatientDialog(true);
+                }}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Select Patient (Required)
+              </Button>
+            )}
+
+            {/* Product Search & Add */}
+            <div>
+              <Label>Add Products</Label>
+              <div className="flex gap-2 mt-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              {searchQuery.length >= 2 && (
+                <div className="mt-2 max-h-48 overflow-auto space-y-1 border rounded-md p-2">
+                  {products.map((product) => (
+                    <div
+                      key={product.id}
+                      className="p-2 hover:bg-accent rounded cursor-pointer flex justify-between items-center"
+                      onClick={() => {
+                        const existing = quotationCart.find(item => item.id === product.id);
+                        if (existing) {
+                          toast({
+                            title: "Already Added",
+                            description: "Product already in quotation",
+                            variant: "destructive",
+                          });
+                        } else {
+                          const price = parseFloat(product.sellingPrice);
+                          const vat = parseFloat(product.vatPercentage);
+                          const subtotal = price;
+                          const vatAmount = (subtotal * vat) / 100;
+                          const total = subtotal + vatAmount;
+
+                          setQuotationCart([...quotationCart, {
+                            ...product,
+                            quantity: 1,
+                            discount: 0,
+                            subtotal,
+                            vatAmount,
+                            total,
+                          }]);
+                          setSearchQuery("");
+                        }
+                      }}
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.genericName}</p>
+                      </div>
+                      <p className="font-bold">${parseFloat(product.sellingPrice).toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Quotation Cart */}
+            {quotationCart.length > 0 && (
+              <div>
+                <Label>Items in Quotation</Label>
+                <div className="mt-2 border rounded-md p-3 space-y-2 max-h-64 overflow-auto">
+                  {quotationCart.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 p-2 bg-accent rounded">
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          ${parseFloat(item.sellingPrice).toFixed(2)} × {item.quantity}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newCart = [...quotationCart];
+                            if (newCart[index].quantity > 1) {
+                              newCart[index].quantity--;
+                              const price = parseFloat(newCart[index].sellingPrice);
+                              const vat = parseFloat(newCart[index].vatPercentage);
+                              const subtotal = price * newCart[index].quantity;
+                              const vatAmount = (subtotal * vat) / 100;
+                              newCart[index].subtotal = subtotal;
+                              newCart[index].vatAmount = vatAmount;
+                              newCart[index].total = subtotal + vatAmount;
+                              setQuotationCart(newCart);
+                            }
+                          }}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newCart = [...quotationCart];
+                            newCart[index].quantity++;
+                            const price = parseFloat(newCart[index].sellingPrice);
+                            const vat = parseFloat(newCart[index].vatPercentage);
+                            const subtotal = price * newCart[index].quantity;
+                            const vatAmount = (subtotal * vat) / 100;
+                            newCart[index].subtotal = subtotal;
+                            newCart[index].vatAmount = vatAmount;
+                            newCart[index].total = subtotal + vatAmount;
+                            setQuotationCart(newCart);
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setQuotationCart(quotationCart.filter((_, i) => i !== index));
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                      <p className="font-bold w-24 text-right">${item.total.toFixed(2)}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quotation Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Valid For (Days)</Label>
+                <Input
+                  type="number"
+                  value={quotationValidDays}
+                  onChange={(e) => setQuotationValidDays(parseInt(e.target.value) || 7)}
+                  min={1}
+                  max={90}
+                />
+              </div>
+              <div>
+                <Label>Total Amount</Label>
+                <Input
+                  value={`$${quotationCart.reduce((sum, item) => sum + item.total, 0).toFixed(2)}`}
+                  disabled
+                  className="font-bold text-lg"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                placeholder="Additional notes or special instructions..."
+                value={quotationNotes}
+                onChange={(e) => setQuotationNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowQuotationDialog(false);
+                  setQuotationCart([]);
+                  setQuotationNotes("");
+                  setQuotationValidDays(7);
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                disabled={!selectedPatient || quotationCart.length === 0 || createQuotationMutation.isPending}
+                onClick={() => {
+                  const quotationData = {
+                    patientId: selectedPatient?.id,
+                    items: quotationCart.map((item) => ({
+                      productId: item.id,
+                      productName: item.name,
+                      quantity: item.quantity,
+                      unitPrice: item.sellingPrice,
+                      vatPercentage: item.vatPercentage,
+                      discount: item.discount || 0,
+                    })),
+                    notes: quotationNotes,
+                    validDays: quotationValidDays,
+                  };
+                  createQuotationMutation.mutate(quotationData);
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {createQuotationMutation.isPending ? "Creating..." : "Create Quotation"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

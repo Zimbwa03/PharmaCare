@@ -364,4 +364,244 @@ router.get('/sales/history', requireAuth(), requireRole('receptionist', 'adminis
   }
 });
 
+// POST /api/receptionist/quotations - Create a new quotation
+router.post('/quotations', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { patientId, items, notes, validDays } = req.body;
+
+    // Validate required fields
+    if (!patientId) {
+      return res.status(400).json({ message: 'Patient is required' });
+    }
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({ message: 'Quotation must have at least one item' });
+    }
+
+    // Calculate totals
+    let subtotal = 0;
+    let totalVAT = 0;
+    
+    items.forEach((item: any) => {
+      const itemSubtotal = parseFloat(item.unitPrice) * item.quantity;
+      const itemVAT = itemSubtotal * (parseFloat(item.vatPercentage) / 100);
+      subtotal += itemSubtotal;
+      totalVAT += itemVAT;
+    });
+
+    const totalAmount = subtotal + totalVAT;
+
+    // Generate quotation number with date format: QUO-2025-0001
+    const currentYear = new Date().getFullYear();
+    const quotationNumber = `QUO-${currentYear}-${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`;
+
+    // Calculate valid until date
+    const validUntil = new Date();
+    validUntil.setDate(validUntil.getDate() + (validDays || 7));
+
+    const userId = (req as any).dbUser?.id || (req as any).user?.id;
+    
+    const quotation = {
+      id: `quot_${Date.now()}`,
+      quotationNumber,
+      patientId,
+      createdBy: userId,
+      subtotal: subtotal.toFixed(2),
+      vatAmount: totalVAT.toFixed(2),
+      totalAmount: totalAmount.toFixed(2),
+      notes: notes || null,
+      validUntil: validUntil.toISOString(),
+      status: 'pending',
+      items: items.map((item: any) => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discount: item.discount || 0,
+      })),
+      createdAt: new Date().toISOString(),
+    };
+
+    console.log('Quotation created:', quotation);
+
+    res.json({
+      success: true,
+      message: 'Quotation created successfully',
+      quotation,
+    });
+  } catch (error) {
+    console.error('Create quotation error:', error);
+    res.status(500).json({ message: 'Error creating quotation' });
+  }
+});
+
+// GET /api/receptionist/quotations - Get all quotations with optional filters
+router.get('/quotations', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { status, search } = req.query;
+
+    // Mock data - will be replaced with real database queries
+    const allQuotations = [
+      {
+        id: 'quot001',
+        quotationNumber: 'QUO-2025-0001',
+        patientId: 'pat001',
+        patientName: 'Tendai Moyo',
+        totalAmount: '125.50',
+        status: 'pending',
+        validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+        items: 3,
+      },
+      {
+        id: 'quot002',
+        quotationNumber: 'QUO-2025-0002',
+        patientId: 'pat002',
+        patientName: 'Chipo Ndlovu',
+        totalAmount: '78.00',
+        status: 'pending',
+        validUntil: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        items: 2,
+      },
+      {
+        id: 'quot003',
+        quotationNumber: 'QUO-2025-0003',
+        patientId: 'pat003',
+        patientName: 'Blessing Chikwanha',
+        totalAmount: '200.00',
+        status: 'converted',
+        validUntil: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        items: 5,
+      },
+    ];
+
+    let filteredQuotations = allQuotations;
+
+    // Filter by status
+    if (status && status !== 'all') {
+      filteredQuotations = filteredQuotations.filter(q => q.status === status);
+    }
+
+    // Search by patient name or quotation number
+    if (search) {
+      const searchLower = (search as string).toLowerCase();
+      filteredQuotations = filteredQuotations.filter(q =>
+        q.quotationNumber.toLowerCase().includes(searchLower) ||
+        q.patientName.toLowerCase().includes(searchLower)
+      );
+    }
+
+    res.json(filteredQuotations);
+  } catch (error) {
+    console.error('Get quotations error:', error);
+    res.status(500).json({ message: 'Error fetching quotations' });
+  }
+});
+
+// GET /api/receptionist/quotations/:id - Get quotation details
+router.get('/quotations/:id', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Mock data - will be replaced with real database query
+    const quotation = {
+      id,
+      quotationNumber: 'QUO-2025-0001',
+      patientId: 'pat001',
+      patientName: 'Tendai Moyo',
+      patientPhone: '+263 77 123 4567',
+      subtotal: '109.13',
+      vatAmount: '16.37',
+      totalAmount: '125.50',
+      status: 'pending',
+      notes: 'Customer requested price estimate for chronic medication',
+      validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+      items: [
+        {
+          productId: 'prod001',
+          productName: 'Paracetamol 500mg',
+          quantity: 100,
+          unitPrice: '0.50',
+          discount: 0,
+          subtotal: '50.00',
+          vatAmount: '7.50',
+          total: '57.50',
+        },
+        {
+          productId: 'prod003',
+          productName: 'Metformin 500mg',
+          quantity: 60,
+          unitPrice: '1.20',
+          discount: 5,
+          subtotal: '68.00',
+          vatAmount: '10.20',
+          total: '78.20',
+        },
+      ],
+    };
+
+    res.json(quotation);
+  } catch (error) {
+    console.error('Get quotation details error:', error);
+    res.status(500).json({ message: 'Error fetching quotation details' });
+  }
+});
+
+// POST /api/receptionist/quotations/:id/convert - Convert quotation to sale
+router.post('/quotations/:id/convert', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { paymentMethod, amountPaid } = req.body;
+
+    if (!paymentMethod) {
+      return res.status(400).json({ message: 'Payment method is required' });
+    }
+
+    // Mock: Fetch quotation and create sale
+    // In real implementation:
+    // 1. Verify quotation exists and is pending
+    // 2. Check quotation is not expired
+    // 3. Create sale from quotation items
+    // 4. Mark quotation as converted
+    // 5. Record payment
+    // 6. Update inventory
+
+    const saleNumber = `SALE${Date.now()}`;
+    const userId = (req as any).dbUser?.id || (req as any).user?.id;
+
+    const sale = {
+      id: `sale_${Date.now()}`,
+      saleNumber,
+      quotationId: id,
+      saleType: 'otc',
+      cashierId: userId,
+      totalAmount: '125.50',
+      paymentMethod,
+      amountPaid,
+      change: paymentMethod === 'cash' ? parseFloat(amountPaid) - 125.50 : 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    console.log('Quotation converted to sale:', sale);
+
+    res.json({
+      success: true,
+      message: 'Quotation converted to sale successfully',
+      sale,
+      receipt: {
+        saleNumber,
+        totalAmount: '125.50',
+        amountPaid,
+        change: sale.change,
+      },
+    });
+  } catch (error) {
+    console.error('Convert quotation error:', error);
+    res.status(500).json({ message: 'Error converting quotation to sale' });
+  }
+});
+
 export default router;
