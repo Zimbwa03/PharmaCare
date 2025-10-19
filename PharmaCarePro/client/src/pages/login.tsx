@@ -56,11 +56,17 @@ export default function Login() {
         return;
       }
 
-      // Login successful - invalidate auth cache and redirect to dashboard
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      
-      // Use full page reload to ensure clean state
-      window.location.href = "/";
+      // Login successful - redirect based on user role
+      // Give browser time to set cookie, then do full reload
+      setTimeout(() => {
+        if (result.user?.role === 'receptionist') {
+          window.location.href = "/receptionist-pos";
+        } else if (result.user?.role === 'administrator') {
+          window.location.href = "/admin-dashboard";
+        } else {
+          window.location.href = "/";
+        }
+      }, 100);
     } catch (err) {
       setError("Network error. Please try again.");
     } finally {
