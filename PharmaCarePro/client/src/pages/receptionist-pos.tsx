@@ -146,6 +146,17 @@ export default function ReceptionistPOS() {
   const [historyStatus, setHistoryStatus] = useState<string>("");
   const [selectedSaleForDetails, setSelectedSaleForDetails] = useState<any>(null);
 
+  // Patient registration state
+  const [newPatientFirstName, setNewPatientFirstName] = useState("");
+  const [newPatientLastName, setNewPatientLastName] = useState("");
+  const [newPatientNationalId, setNewPatientNationalId] = useState("");
+  const [newPatientPhone, setNewPatientPhone] = useState("");
+  const [newPatientGender, setNewPatientGender] = useState("");
+  const [newPatientDOB, setNewPatientDOB] = useState("");
+  const [newPatientEmail, setNewPatientEmail] = useState("");
+  const [newPatientAddress, setNewPatientAddress] = useState("");
+  const [newPatientAllergies, setNewPatientAllergies] = useState("");
+
   // Fetch pending prescriptions
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
     queryKey: ["/api/receptionist/prescriptions/pending"],
@@ -394,6 +405,47 @@ export default function ReceptionistPOS() {
     onError: (error: Error) => {
       toast({
         title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Register patient mutation
+  const registerPatientMutation = useMutation({
+    mutationFn: async (patientData: any) => {
+      const response = await fetch("/api/patients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patientData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to register patient");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Patient Registered",
+        description: `${data.firstName} ${data.lastName} registered successfully!`,
+      });
+      setSelectedPatient(data);
+      setShowPatientDialog(false);
+      // Clear form
+      setNewPatientFirstName("");
+      setNewPatientLastName("");
+      setNewPatientNationalId("");
+      setNewPatientPhone("");
+      setNewPatientGender("");
+      setNewPatientDOB("");
+      setNewPatientEmail("");
+      setNewPatientAddress("");
+      setNewPatientAllergies("");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Registration Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -1767,23 +1819,42 @@ export default function ReceptionistPOS() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>First Name *</Label>
-                  <Input placeholder="John" required />
+                  <Input 
+                    placeholder="John" 
+                    required 
+                    value={newPatientFirstName}
+                    onChange={(e) => setNewPatientFirstName(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Last Name *</Label>
-                  <Input placeholder="Doe" required />
+                  <Input 
+                    placeholder="Doe" 
+                    required 
+                    value={newPatientLastName}
+                    onChange={(e) => setNewPatientLastName(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>National ID</Label>
-                  <Input placeholder="63-1234567X89" />
+                  <Input 
+                    placeholder="63-1234567X89" 
+                    value={newPatientNationalId}
+                    onChange={(e) => setNewPatientNationalId(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Phone Number *</Label>
-                  <Input placeholder="+263 77 123 4567" required />
+                  <Input 
+                    placeholder="+263 77 123 4567" 
+                    required 
+                    value={newPatientPhone}
+                    onChange={(e) => setNewPatientPhone(e.target.value)}
+                  />
                 </div>
                 <div>
                   <Label>Gender</Label>
-                  <Select>
+                  <Select value={newPatientGender} onValueChange={setNewPatientGender}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
@@ -1796,27 +1867,62 @@ export default function ReceptionistPOS() {
                 </div>
                 <div>
                   <Label>Date of Birth</Label>
-                  <Input type="date" />
+                  <Input 
+                    type="date" 
+                    value={newPatientDOB}
+                    onChange={(e) => setNewPatientDOB(e.target.value)}
+                  />
                 </div>
                 <div className="col-span-2">
                   <Label>Email (Optional)</Label>
-                  <Input type="email" placeholder="john.doe@email.com" />
+                  <Input 
+                    type="email" 
+                    placeholder="john.doe@email.com" 
+                    value={newPatientEmail}
+                    onChange={(e) => setNewPatientEmail(e.target.value)}
+                  />
                 </div>
                 <div className="col-span-2">
                   <Label>Address (Optional)</Label>
-                  <Textarea placeholder="Street address, city" rows={2} />
+                  <Textarea 
+                    placeholder="Street address, city" 
+                    rows={2}
+                    value={newPatientAddress}
+                    onChange={(e) => setNewPatientAddress(e.target.value)}
+                  />
                 </div>
                 <div className="col-span-2">
                   <Label>Known Allergies (Optional)</Label>
-                  <Input placeholder="e.g., Penicillin, Sulfa drugs" />
+                  <Input 
+                    placeholder="e.g., Penicillin, Sulfa drugs" 
+                    value={newPatientAllergies}
+                    onChange={(e) => setNewPatientAllergies(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="flex gap-2 pt-4">
                 <Button variant="outline" onClick={() => setShowPatientDialog(false)} className="flex-1">
                   Cancel
                 </Button>
-                <Button className="flex-1">
-                  Register & Select
+                <Button 
+                  className="flex-1"
+                  disabled={!newPatientFirstName || !newPatientLastName || !newPatientPhone || registerPatientMutation.isPending}
+                  onClick={() => {
+                    const patientData = {
+                      firstName: newPatientFirstName,
+                      lastName: newPatientLastName,
+                      nationalId: newPatientNationalId || null,
+                      phone: newPatientPhone,
+                      gender: newPatientGender || null,
+                      dateOfBirth: newPatientDOB || null,
+                      email: newPatientEmail || null,
+                      address: newPatientAddress || null,
+                      allergies: newPatientAllergies ? newPatientAllergies.split(',').map(a => a.trim()) : [],
+                    };
+                    registerPatientMutation.mutate(patientData);
+                  }}
+                >
+                  {registerPatientMutation.isPending ? "Registering..." : "Register & Select"}
                 </Button>
               </div>
             </TabsContent>
