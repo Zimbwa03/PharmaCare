@@ -280,3 +280,246 @@ export const auditLogs = pgTable("audit_logs", {
 });
 
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+// Sale/Transaction status enum
+export const saleStatusEnum = pgEnum('sale_status', [
+  'pending',
+  'completed',
+  'refunded',
+  'partially_refunded',
+  'cancelled'
+]);
+
+// Sale type enum
+export const saleTypeEnum = pgEnum('sale_type', [
+  'prescription',  // From pharmacist prescription
+  'otc',          // Over-the-counter direct sale
+  'quotation'     // Quotation
+]);
+
+// Sales/Transactions table
+export const sales = pgTable("sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleNumber: varchar("sale_number").unique().notNull(),
+  saleType: saleTypeEnum("sale_type").notNull(),
+  patientId: varchar("patient_id").references(() => patients.id),
+  prescriptionId: varchar("prescription_id").references(() => prescriptions.id),
+  cashierId: varchar("cashier_id").notNull().references(() => users.id),
+  status: saleStatusEnum("status").notNull().default('pending'),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default('0'),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  amountPaid: decimal("amount_paid", { precision: 10, scale: 2 }),
+  change: decimal("change", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  shiftId: varchar("shift_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSaleSchema = createInsertSchema(sales).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSale = z.infer<typeof insertSaleSchema>;
+export type Sale = typeof sales.$inferSelect;
+
+// Sale items table
+export const saleItems = pgTable("sale_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull().references(() => sales.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default('0'),
+  vatAmount: decimal("vat_amount", { precision: 10, scale: 2 }).notNull().default('0'),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  batchNumber: varchar("batch_number"),
+  expiryDate: timestamp("expiry_date"),
+  instructions: text("instructions"),
+});
+
+export const insertSaleItemSchema = createInsertSchema(saleItems).omit({
+  id: true,
+});
+
+export type InsertSaleItem = z.infer<typeof insertSaleItemSchema>;
+export type SaleItem = typeof saleItems.$inferSelect;
+
+// Payment method enum
+export const paymentMethodEnum = pgEnum('payment_method', [
+  'cash',
+  'card',
+  'ecocash',
+  'onemoney',
+  'bank_transfer',
+  'insurance'
+]);
+
+// Payments table
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull().references(() => sales.id),
+  paymentMethod: paymentMethodEnum("payment_method").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  reference: varchar("reference"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
+
+// Return status enum
+export const returnStatusEnum = pgEnum('return_status', [
+  'pending',
+  'approved',
+  'rejected',
+  'completed'
+]);
+
+// Returns table
+export const returns = pgTable("returns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  returnNumber: varchar("return_number").unique().notNull(),
+  saleId: varchar("sale_id").notNull().references(() => sales.id),
+  customerId: varchar("customer_id").references(() => patients.id),
+  returnedBy: varchar("returned_by").notNull().references(() => users.id),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  status: returnStatusEnum("status").notNull().default('pending'),
+  reason: text("reason"),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }),
+  refundMethod: paymentMethodEnum("refund_method"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertReturnSchema = createInsertSchema(returns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertReturn = z.infer<typeof insertReturnSchema>;
+export type Return = typeof returns.$inferSelect;
+
+// Return items table
+export const returnItems = pgTable("return_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  returnId: varchar("return_id").notNull().references(() => returns.id),
+  saleItemId: varchar("sale_item_id").notNull().references(() => saleItems.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  quantityReturned: integer("quantity_returned").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason"),
+});
+
+export const insertReturnItemSchema = createInsertSchema(returnItems).omit({
+  id: true,
+});
+
+export type InsertReturnItem = z.infer<typeof insertReturnItemSchema>;
+export type ReturnItem = typeof returnItems.$inferSelect;
+
+// Drug short codes table (for quick access keys F1-F12, etc.)
+export const drugShortCodes = pgTable("drug_short_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  keyCode: varchar("key_code").unique().notNull(), // e.g., "F1", "F2", etc.
+  productId: varchar("product_id").notNull().references(() => products.id),
+  userId: varchar("user_id").references(() => users.id), // If user-specific, null for global
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertDrugShortCodeSchema = createInsertSchema(drugShortCodes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDrugShortCode = z.infer<typeof insertDrugShortCodeSchema>;
+export type DrugShortCode = typeof drugShortCodes.$inferSelect;
+
+// Quotations table
+export const quotations = pgTable("quotations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quotationNumber: varchar("quotation_number").unique().notNull(),
+  customerId: varchar("customer_id").references(() => patients.id),
+  customerName: varchar("customer_name"),
+  customerPhone: varchar("customer_phone"),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
+  validUntil: timestamp("valid_until"),
+  notes: text("notes"),
+  status: varchar("status").default('active'), // active, expired, converted
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertQuotationSchema = createInsertSchema(quotations).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertQuotation = z.infer<typeof insertQuotationSchema>;
+export type Quotation = typeof quotations.$inferSelect;
+
+// Quotation items table
+export const quotationItems = pgTable("quotation_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  quotationId: varchar("quotation_id").notNull().references(() => quotations.id),
+  productId: varchar("product_id").notNull().references(() => products.id),
+  quantity: integer("quantity").notNull(),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertQuotationItemSchema = createInsertSchema(quotationItems).omit({
+  id: true,
+});
+
+export type InsertQuotationItem = z.infer<typeof insertQuotationItemSchema>;
+export type QuotationItem = typeof quotationItems.$inferSelect;
+
+// Shift status enum
+export const shiftStatusEnum = pgEnum('shift_status', [
+  'open',
+  'closed',
+  'reconciled'
+]);
+
+// Shifts table (for cash management and reconciliation)
+export const shifts = pgTable("shifts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shiftNumber: varchar("shift_number").unique().notNull(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: shiftStatusEnum("status").notNull().default('open'),
+  openingCash: decimal("opening_cash", { precision: 10, scale: 2 }).notNull(),
+  closingCash: decimal("closing_cash", { precision: 10, scale: 2 }),
+  expectedCash: decimal("expected_cash", { precision: 10, scale: 2 }),
+  cashVariance: decimal("cash_variance", { precision: 10, scale: 2 }),
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }),
+  totalCashSales: decimal("total_cash_sales", { precision: 10, scale: 2 }),
+  totalCardSales: decimal("total_card_sales", { precision: 10, scale: 2 }),
+  totalMobileMoneySales: decimal("total_mobile_money_sales", { precision: 10, scale: 2 }),
+  notes: text("notes"),
+  openedAt: timestamp("opened_at").defaultNow(),
+  closedAt: timestamp("closed_at"),
+});
+
+export const insertShiftSchema = createInsertSchema(shifts).omit({
+  id: true,
+  openedAt: true,
+});
+
+export type InsertShift = z.infer<typeof insertShiftSchema>;
+export type Shift = typeof shifts.$inferSelect;
