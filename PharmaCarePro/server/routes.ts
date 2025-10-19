@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { requireAuth, requireRole } from "./auth";
 import authRoutes from "./authRoutes";
 import adminRoutes from "./adminRoutes";
+import receptionistRoutes from "./receptionistRoutes";
 import { insertPatientSchema, insertProductSchema, insertStockMovementSchema } from "@shared/schema";
 import { checkDrugInteractions, forecastDemand } from "./ai-services";
 
@@ -28,6 +29,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Admin routes (protected - admin only)
   app.use('/api/admin', adminRoutes);
+  
+  // Receptionist routes (protected - receptionist and admin only)
+  app.use('/api/receptionist', receptionistRoutes);
+
+  // Products search (for POS and other modules)
+  app.get("/api/products/search", requireAuth(), async (req, res) => {
+    try {
+      const query = req.query.q as string;
+
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+
+      const products = await storage.getAllProducts();
+      
+      // Simple search filter
+      const searchResults = products.filter(product =>
+        product.name.toLowerCase().includes(query.toLowerCase()) ||
+        (product.genericName && product.genericName.toLowerCase().includes(query.toLowerCase())) ||
+        (product.barcode && product.barcode.includes(query))
+      );
+
+      res.json(searchResults.slice(0, 20)); // Limit to 20 results
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search products" });
+    }
+  });
 
   // Dashboard stats
   app.get("/api/dashboard/stats", requireAuth(), async (req, res) => {

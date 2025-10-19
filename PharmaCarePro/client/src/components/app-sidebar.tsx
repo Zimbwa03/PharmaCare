@@ -44,13 +44,19 @@ const mainMenuItems: MenuItem[] = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
-    roles: ["administrator", "pharmacist", "receptionist", "technician", "store_manager"],
+    roles: ["administrator", "pharmacist", "technician", "store_manager"],
+  },
+  {
+    title: "Point of Sale (POS)",
+    url: "/receptionist-pos",
+    icon: Activity,
+    roles: ["receptionist"],
   },
   {
     title: "Patients",
     url: "/patients",
     icon: Users,
-    roles: ["administrator", "pharmacist", "receptionist"],
+    roles: ["administrator", "pharmacist"],
   },
   {
     title: "Prescriptions",
@@ -149,7 +155,7 @@ const systemItems: MenuItem[] = [
     title: "Settings",
     url: "/settings",
     icon: Settings,
-    roles: ["administrator", "pharmacist"],
+    roles: ["administrator"],
   },
 ];
 
