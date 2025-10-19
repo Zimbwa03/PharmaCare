@@ -50,6 +50,7 @@ import {
   Package,
   TrendingUp,
   X,
+  History,
 } from "lucide-react";
 
 interface Product {
@@ -140,6 +141,11 @@ export default function ReceptionistPOS() {
   const [refundMethod, setRefundMethod] = useState<string>("cash");
   const [showReturnConfirm, setShowReturnConfirm] = useState(false);
 
+  const [historyStartDate, setHistoryStartDate] = useState<string>("");
+  const [historyEndDate, setHistoryEndDate] = useState<string>("");
+  const [historyStatus, setHistoryStatus] = useState<string>("");
+  const [selectedSaleForDetails, setSelectedSaleForDetails] = useState<any>(null);
+
   // Fetch pending prescriptions
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
     queryKey: ["/api/receptionist/prescriptions/pending"],
@@ -196,6 +202,21 @@ export default function ReceptionistPOS() {
       return response.json();
     },
     enabled: searchQuery.length >= 2,
+  });
+
+  // Fetch sales history
+  const { data: salesHistory = [] } = useQuery({
+    queryKey: ["/api/receptionist/sales", historyStartDate, historyEndDate, historyStatus],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (historyStartDate) params.append("startDate", historyStartDate);
+      if (historyEndDate) params.append("endDate", historyEndDate);
+      if (historyStatus) params.append("status", historyStatus);
+
+      const response = await fetch(`/api/receptionist/sales?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to fetch sales history");
+      return response.json();
+    },
   });
 
   // Process sale mutation
@@ -638,7 +659,7 @@ export default function ReceptionistPOS() {
           </CardHeader>
           <CardContent className="p-4">
             <Tabs value={selectedTab} onValueChange={setSelectedTab} className="h-full">
-              <TabsList className="grid w-full grid-cols-5 mb-4">
+              <TabsList className="grid w-full grid-cols-6 mb-4">
                 <TabsTrigger value="prescription" className="flex items-center gap-2">
                   <Receipt className="h-4 w-4" />
                   Prescriptions (F1)
@@ -654,6 +675,10 @@ export default function ReceptionistPOS() {
                 <TabsTrigger value="returns" className="flex items-center gap-2">
                   <RotateCcw className="h-4 w-4" />
                   Returns (F10)
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  History (F11)
                 </TabsTrigger>
                 <TabsTrigger value="shortcode" className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
@@ -1097,6 +1122,126 @@ export default function ReceptionistPOS() {
                       )}
                     </>
                   )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-0 h-[calc(100vh-20rem)] overflow-auto">
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <div>
+                      <Label>Start Date</Label>
+                      <Input
+                        type="date"
+                        value={historyStartDate}
+                        onChange={(e) => setHistoryStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>End Date</Label>
+                      <Input
+                        type="date"
+                        value={historyEndDate}
+                        onChange={(e) => setHistoryEndDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label>Status</Label>
+                      <Select value={historyStatus} onValueChange={setHistoryStatus}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="All Statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">All Statuses</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="refunded">Refunded</SelectItem>
+                          <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setHistoryStartDate("");
+                          setHistoryEndDate("");
+                          setHistoryStatus("");
+                        }}
+                      >
+                        Clear Filters
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Sales History</CardTitle>
+                      <CardDescription>
+                        {salesHistory.length} sale(s) found
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {salesHistory.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                          <Receipt className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>No sales found. Adjust your filters or make a sale.</p>
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Sale #</TableHead>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Patient</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Cashier</TableHead>
+                              <TableHead></TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {salesHistory.map((sale: any) => (
+                              <TableRow key={sale.id}>
+                                <TableCell className="font-medium">{sale.saleNumber}</TableCell>
+                                <TableCell>
+                                  {new Date(sale.createdAt).toLocaleDateString()} {new Date(sale.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </TableCell>
+                                <TableCell>{sale.patientName || 'Walk-in'}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">
+                                    {sale.saleType === 'otc' ? 'OTC' : sale.saleType === 'prescription' ? 'Prescription' : 'Quotation'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="font-semibold">${parseFloat(sale.totalAmount).toFixed(2)}</TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    sale.status === 'completed' ? 'default' :
+                                    sale.status === 'refunded' ? 'destructive' :
+                                    sale.status === 'partially_refunded' ? 'secondary' : 'outline'
+                                  }>
+                                    {sale.status === 'partially_refunded' ? 'Partial Return' : sale.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">
+                                  {sale.cashierName || 'Unknown'}
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setSelectedSaleForDetails(sale)}
+                                  >
+                                    View Details
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               </TabsContent>
 
@@ -1929,6 +2074,118 @@ export default function ReceptionistPOS() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sale Details Dialog */}
+      <Dialog open={!!selectedSaleForDetails} onOpenChange={(open) => !open && setSelectedSaleForDetails(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sale Details</DialogTitle>
+            <DialogDescription>
+              {selectedSaleForDetails && `Sale #${selectedSaleForDetails.saleNumber}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedSaleForDetails && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-muted-foreground">Date & Time</Label>
+                  <p className="font-medium">
+                    {new Date(selectedSaleForDetails.createdAt).toLocaleDateString()} at {new Date(selectedSaleForDetails.createdAt).toLocaleTimeString()}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Cashier</Label>
+                  <p className="font-medium">{selectedSaleForDetails.cashierName || 'Unknown'}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Patient</Label>
+                  <p className="font-medium">{selectedSaleForDetails.patientName || 'Walk-in Customer'}</p>
+                  {selectedSaleForDetails.patientPhone && (
+                    <p className="text-sm text-muted-foreground">{selectedSaleForDetails.patientPhone}</p>
+                  )}
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Status</Label>
+                  <div className="mt-1">
+                    <Badge variant={
+                      selectedSaleForDetails.status === 'completed' ? 'default' :
+                      selectedSaleForDetails.status === 'refunded' ? 'destructive' :
+                      selectedSaleForDetails.status === 'partially_refunded' ? 'secondary' : 'outline'
+                    }>
+                      {selectedSaleForDetails.status === 'partially_refunded' ? 'Partial Return' : selectedSaleForDetails.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Payment Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal:</span>
+                    <span className="font-medium">${parseFloat(selectedSaleForDetails.subtotal).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">VAT (15%):</span>
+                    <span className="font-medium">${parseFloat(selectedSaleForDetails.vatAmount).toFixed(2)}</span>
+                  </div>
+                  {selectedSaleForDetails.discount && parseFloat(selectedSaleForDetails.discount) > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>Discount:</span>
+                      <span className="font-medium">-${parseFloat(selectedSaleForDetails.discount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold border-t pt-2">
+                    <span>Total:</span>
+                    <span>${parseFloat(selectedSaleForDetails.totalAmount).toFixed(2)}</span>
+                  </div>
+                  {selectedSaleForDetails.amountPaid && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Amount Paid:</span>
+                        <span className="font-medium">${parseFloat(selectedSaleForDetails.amountPaid).toFixed(2)}</span>
+                      </div>
+                      {selectedSaleForDetails.change && parseFloat(selectedSaleForDetails.change) > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Change:</span>
+                          <span className="font-medium">${parseFloat(selectedSaleForDetails.change).toFixed(2)}</span>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedSaleForDetails(null)}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+                {selectedSaleForDetails.status !== 'refunded' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedSaleForDetails(null);
+                      setSelectedTab('returns');
+                      setSaleSearchQuery(selectedSaleForDetails.saleNumber);
+                    }}
+                    className="flex-1"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Process Return
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       </div>
