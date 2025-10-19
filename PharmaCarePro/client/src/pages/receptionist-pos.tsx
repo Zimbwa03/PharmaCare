@@ -423,6 +423,16 @@ export default function ReceptionistPOS() {
   };
 
   const handleCheckout = () => {
+    if (!currentShift) {
+      toast({
+        title: "No Active Shift",
+        description: "Please open a shift before processing sales",
+        variant: "destructive",
+      });
+      setShowOpenShiftDialog(true);
+      return;
+    }
+
     if (cart.length === 0) {
       toast({
         title: "Empty Cart",
