@@ -675,4 +675,25 @@ router.post('/returns', requireAuth(), requireRole('receptionist', 'administrato
   }
 });
 
+// GET /api/receptionist/sales - Get sales history with filters
+router.get('/sales', requireAuth(), requireRole('receptionist', 'administrator'), async (req: Request, res: Response) => {
+  try {
+    const { startDate, endDate, patientId, status, limit = '50', offset = '0' } = req.query;
+
+    const sales = await storage.getSalesHistory({
+      startDate: startDate as string,
+      endDate: endDate as string,
+      patientId: patientId as string,
+      status: status as string,
+      limit: parseInt(limit as string),
+      offset: parseInt(offset as string),
+    });
+
+    res.json(sales);
+  } catch (error) {
+    console.error('Get sales history error:', error);
+    res.status(500).json({ message: 'Error fetching sales history' });
+  }
+});
+
 export default router;

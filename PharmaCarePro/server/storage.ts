@@ -498,6 +498,64 @@ class DatabaseStorage implements IStorage {
 
     return returnRecord;
   }
+
+  async getSalesHistory(filters: {
+    startDate?: string;
+    endDate?: string;
+    patientId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any[]> {
+    const { startDate, endDate, patientId, status, limit = 50, offset = 0 } = filters;
+
+    // Build where conditions
+    const conditions = [];
+    
+    if (startDate) {
+      conditions.push(sql`${sales.createdAt} >= ${startDate}`);
+    }
+    if (endDate) {
+      conditions.push(sql`${sales.createdAt} <= ${endDate}`);
+    }
+    if (patientId) {
+      conditions.push(eq(sales.patientId, patientId));
+    }
+    if (status) {
+      conditions.push(sql`${sales.status} = ${status}`);
+    }
+
+    // Fetch sales with patient and cashier info
+    const results = await db
+      .select({
+        id: sales.id,
+        saleNumber: sales.saleNumber,
+        saleType: sales.saleType,
+        subtotal: sales.subtotal,
+        vatAmount: sales.vatAmount,
+        discount: sales.discount,
+        totalAmount: sales.totalAmount,
+        amountPaid: sales.amountPaid,
+        change: sales.change,
+        status: sales.status,
+        createdAt: sales.createdAt,
+        patientId: patients.id,
+        patientName: sql<string>`${patients.firstName} || ' ' || ${patients.lastName}`,
+        patientPhone: patients.phone,
+        cashierId: users.id,
+        cashierName: sql<string>`${users.firstName} || ' ' || ${users.lastName}`,
+        shiftId: sales.shiftId,
+      })
+      .from(sales)
+      .leftJoin(patients, eq(sales.patientId, patients.id))
+      .leftJoin(users, eq(sales.cashierId, users.id))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(sales.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return results;
+  }
 }
 
 export const storage = new DatabaseStorage();
