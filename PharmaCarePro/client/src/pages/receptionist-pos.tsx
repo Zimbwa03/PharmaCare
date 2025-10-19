@@ -131,6 +131,14 @@ export default function ReceptionistPOS() {
   const [openingCash, setOpeningCash] = useState("");
   const [closingCash, setClosingCash] = useState("");
   const [shiftNotes, setShiftNotes] = useState("");
+  
+  // Returns state
+  const [saleSearchQuery, setSaleSearchQuery] = useState("");
+  const [selectedSaleForReturn, setSelectedSaleForReturn] = useState<any>(null);
+  const [returnItems, setReturnItems] = useState<any[]>([]);
+  const [returnReason, setReturnReason] = useState("");
+  const [refundMethod, setRefundMethod] = useState<string>("cash");
+  const [showReturnConfirm, setShowReturnConfirm] = useState(false);
 
   // Fetch pending prescriptions
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
@@ -300,6 +308,66 @@ export default function ReceptionistPOS() {
       setClosingCash("");
       setShiftNotes("");
       setShowCloseShiftDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/receptionist/shift/current"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Search sales for returns
+  const { data: salesSearchResults = [] } = useQuery({
+    queryKey: ["/api/receptionist/sales/search", saleSearchQuery],
+    queryFn: async () => {
+      if (!saleSearchQuery || saleSearchQuery.length < 3) return [];
+      const response = await fetch(`/api/receptionist/sales/search?query=${encodeURIComponent(saleSearchQuery)}`);
+      if (!response.ok) throw new Error("Failed to search sales");
+      return response.json();
+    },
+    enabled: saleSearchQuery.length >= 3,
+  });
+
+  // Get sale details
+  const { data: saleDetails } = useQuery({
+    queryKey: ["/api/receptionist/sales", selectedSaleForReturn?.id],
+    queryFn: async () => {
+      if (!selectedSaleForReturn?.id) return null;
+      const response = await fetch(`/api/receptionist/sales/${selectedSaleForReturn.id}`);
+      if (!response.ok) throw new Error("Failed to fetch sale details");
+      return response.json();
+    },
+    enabled: !!selectedSaleForReturn?.id,
+  });
+
+  // Process return mutation
+  const processReturnMutation = useMutation({
+    mutationFn: async (returnData: any) => {
+      const response = await fetch("/api/receptionist/returns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(returnData),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to process return");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Return Processed",
+        description: `Return ${data.return.returnNumber} processed successfully!`,
+      });
+      setSaleSearchQuery("");
+      setSelectedSaleForReturn(null);
+      setReturnItems([]);
+      setReturnReason("");
+      setRefundMethod("cash");
+      setShowReturnConfirm(false);
       queryClient.invalidateQueries({ queryKey: ["/api/receptionist/shift/current"] });
     },
     onError: (error: Error) => {
@@ -570,7 +638,7 @@ export default function ReceptionistPOS() {
           </CardHeader>
           <CardContent className="p-4">
             <Tabs value={selectedTab} onValueChange={setSelectedTab} className="h-full">
-              <TabsList className="grid w-full grid-cols-4 mb-4">
+              <TabsList className="grid w-full grid-cols-5 mb-4">
                 <TabsTrigger value="prescription" className="flex items-center gap-2">
                   <Receipt className="h-4 w-4" />
                   Prescriptions (F1)
@@ -582,6 +650,10 @@ export default function ReceptionistPOS() {
                 <TabsTrigger value="quotations" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
                   Quotations (F9)
+                </TabsTrigger>
+                <TabsTrigger value="returns" className="flex items-center gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Returns (F10)
                 </TabsTrigger>
                 <TabsTrigger value="shortcode" className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4" />
@@ -756,6 +828,275 @@ export default function ReceptionistPOS() {
                       ))
                     )}
                   </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="returns" className="mt-0 h-[calc(100vh-20rem)] overflow-auto">
+                <div className="space-y-4">
+                  {!selectedSaleForReturn ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search by sale number or patient name (min 3 characters)..."
+                            value={saleSearchQuery}
+                            onChange={(e) => setSaleSearchQuery(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+
+                      {saleSearchQuery.length >= 3 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Search Results</CardTitle>
+                            <CardDescription>
+                              {salesSearchResults.length} sale(s) found
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            {salesSearchResults.length === 0 ? (
+                              <p className="text-center text-muted-foreground py-8">
+                                No sales found. Try a different search term.
+                              </p>
+                            ) : (
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Sale #</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Patient</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead></TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {salesSearchResults.map((sale: any) => (
+                                    <TableRow key={sale.id}>
+                                      <TableCell className="font-medium">{sale.saleNumber}</TableCell>
+                                      <TableCell>{new Date(sale.createdAt).toLocaleDateString()}</TableCell>
+                                      <TableCell>{sale.patientName || 'N/A'}</TableCell>
+                                      <TableCell>${parseFloat(sale.totalAmount).toFixed(2)}</TableCell>
+                                      <TableCell>
+                                        <Badge variant={
+                                          sale.status === 'refunded' ? 'destructive' :
+                                          sale.status === 'partially_refunded' ? 'secondary' : 'default'
+                                        }>
+                                          {sale.status}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => setSelectedSaleForReturn(sale)}
+                                          disabled={sale.status === 'refunded'}
+                                        >
+                                          {sale.status === 'refunded' ? 'Fully Refunded' : 'Process Return'}
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {saleDetails && (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-lg font-semibold">Return Sale: {saleDetails.saleNumber}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Patient: {saleDetails.patientName} • Date: {new Date(saleDetails.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Button variant="outline" onClick={() => {
+                              setSelectedSaleForReturn(null);
+                              setReturnItems([]);
+                              setReturnReason("");
+                            }}>
+                              <X className="h-4 w-4 mr-2" />
+                              Back to Search
+                            </Button>
+                          </div>
+
+                          <Card>
+                            <CardHeader>
+                              <CardTitle>Select Items to Return</CardTitle>
+                              <CardDescription>
+                                Choose items and quantities to return
+                              </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Select</TableHead>
+                                    <TableHead>Product</TableHead>
+                                    <TableHead>Qty Sold</TableHead>
+                                    <TableHead>Qty to Return</TableHead>
+                                    <TableHead>Unit Price</TableHead>
+                                    <TableHead>Subtotal</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {saleDetails.items.map((item: any) => {
+                                    const returnItem = returnItems.find(ri => ri.saleItemId === item.id);
+                                    const qtyToReturn = returnItem?.quantityReturned || 0;
+                                    
+                                    return (
+                                      <TableRow key={item.id}>
+                                        <TableCell>
+                                          <input
+                                            type="checkbox"
+                                            checked={!!returnItem}
+                                            onChange={(e) => {
+                                              if (e.target.checked) {
+                                                setReturnItems([...returnItems, {
+                                                  saleItemId: item.id,
+                                                  productId: item.productId,
+                                                  productName: item.productName,
+                                                  unitPrice: item.unitPrice,
+                                                  quantityReturned: 1,
+                                                  maxQuantity: item.quantity,
+                                                }]);
+                                              } else {
+                                                setReturnItems(returnItems.filter(ri => ri.saleItemId !== item.id));
+                                              }
+                                            }}
+                                            className="h-4 w-4"
+                                          />
+                                        </TableCell>
+                                        <TableCell>{item.productName}</TableCell>
+                                        <TableCell>{item.quantity}</TableCell>
+                                        <TableCell>
+                                          {returnItem ? (
+                                            <div className="flex items-center gap-2">
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setReturnItems(returnItems.map(ri =>
+                                                    ri.saleItemId === item.id && ri.quantityReturned > 1
+                                                      ? { ...ri, quantityReturned: ri.quantityReturned - 1 }
+                                                      : ri
+                                                  ));
+                                                }}
+                                                disabled={qtyToReturn <= 1}
+                                              >
+                                                <Minus className="h-3 w-3" />
+                                              </Button>
+                                              <span className="w-8 text-center">{qtyToReturn}</span>
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                  setReturnItems(returnItems.map(ri =>
+                                                    ri.saleItemId === item.id && ri.quantityReturned < item.quantity
+                                                      ? { ...ri, quantityReturned: ri.quantityReturned + 1 }
+                                                      : ri
+                                                  ));
+                                                }}
+                                                disabled={qtyToReturn >= item.quantity}
+                                              >
+                                                <Plus className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          ) : (
+                                            <span className="text-muted-foreground">-</span>
+                                          )}
+                                        </TableCell>
+                                        <TableCell>${parseFloat(item.unitPrice).toFixed(2)}</TableCell>
+                                        <TableCell>
+                                          {returnItem ? `$${(parseFloat(item.unitPrice) * qtyToReturn).toFixed(2)}` : '-'}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </TableBody>
+                              </Table>
+
+                              <div className="mt-6 space-y-4">
+                                <div>
+                                  <Label>Return Reason</Label>
+                                  <Textarea
+                                    placeholder="Please provide a reason for the return..."
+                                    value={returnReason}
+                                    onChange={(e) => setReturnReason(e.target.value)}
+                                    rows={3}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Label>Refund Method</Label>
+                                  <Select value={refundMethod} onValueChange={setRefundMethod}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="cash">Cash</SelectItem>
+                                      <SelectItem value="card">Card Reversal</SelectItem>
+                                      <SelectItem value="ecocash">EcoCash</SelectItem>
+                                      <SelectItem value="onemoney">OneMoney</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                                  <CardContent className="p-4">
+                                    <div className="flex justify-between items-center text-lg font-bold">
+                                      <span>Total Refund Amount:</span>
+                                      <span>
+                                        $
+                                        {returnItems.reduce((sum, item) => 
+                                          sum + (parseFloat(item.unitPrice) * item.quantityReturned), 0
+                                        ).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+
+                                <div className="flex gap-2 pt-4">
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedSaleForReturn(null);
+                                      setReturnItems([]);
+                                      setReturnReason("");
+                                    }}
+                                    className="flex-1"
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    className="flex-1 bg-red-600 hover:bg-red-700"
+                                    disabled={returnItems.length === 0 || !returnReason || processReturnMutation.isPending}
+                                    onClick={() => {
+                                      processReturnMutation.mutate({
+                                        saleId: saleDetails.id,
+                                        items: returnItems,
+                                        reason: returnReason,
+                                        refundMethod,
+                                      });
+                                    }}
+                                  >
+                                    <RotateCcw className="h-4 w-4 mr-2" />
+                                    {processReturnMutation.isPending ? "Processing..." : "Process Return"}
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </TabsContent>
 
