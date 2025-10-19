@@ -57,6 +57,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Patient search (for POS and other modules)
+  app.get("/api/patients/search", requireAuth(), async (req, res) => {
+    try {
+      const query = req.query.q as string;
+
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+
+      const patients = await storage.getAllPatients();
+      
+      // Simple search filter
+      const searchResults = patients.filter(patient =>
+        patient.firstName.toLowerCase().includes(query.toLowerCase()) ||
+        patient.lastName.toLowerCase().includes(query.toLowerCase()) ||
+        (patient.phone && patient.phone.includes(query)) ||
+        (patient.nationalId && patient.nationalId.includes(query))
+      );
+
+      res.json(searchResults.slice(0, 20)); // Limit to 20 results
+    } catch (error) {
+      res.status(500).json({ message: "Failed to search patients" });
+    }
+  });
+
   // Dashboard stats
   app.get("/api/dashboard/stats", requireAuth(), async (req, res) => {
     try {

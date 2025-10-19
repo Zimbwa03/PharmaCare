@@ -92,6 +92,22 @@ interface Prescription {
   }>;
 }
 
+interface Patient {
+  id: string;
+  nationalId?: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  gender?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  allergies?: string[];
+  chronicConditions?: string[];
+  insuranceProvider?: string;
+  insuranceNumber?: string;
+}
+
 export default function ReceptionistPOS() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -103,8 +119,9 @@ export default function ReceptionistPOS() {
   const [showPayment, setShowPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [amountReceived, setAmountReceived] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [showPatientDialog, setShowPatientDialog] = useState(false);
+  const [patientSearchQuery, setPatientSearchQuery] = useState("");
 
   // Fetch pending prescriptions
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
@@ -114,6 +131,18 @@ export default function ReceptionistPOS() {
       if (!response.ok) throw new Error("Failed to fetch prescriptions");
       return response.json();
     },
+  });
+
+  // Search patients
+  const { data: patients = [] } = useQuery<Patient[]>({
+    queryKey: ["/api/patients/search", patientSearchQuery],
+    queryFn: async () => {
+      if (!patientSearchQuery || patientSearchQuery.length < 2) return [];
+      const response = await fetch(`/api/patients/search?q=${encodeURIComponent(patientSearchQuery)}`);
+      if (!response.ok) throw new Error("Failed to search patients");
+      return response.json();
+    },
+    enabled: patientSearchQuery.length >= 2,
   });
 
   // Search products for OTC sales (STRICT: receptionist-only endpoint)
@@ -216,7 +245,12 @@ export default function ReceptionistPOS() {
     });
 
     setCart(cartItems);
-    setCustomerName(prescription.patientName);
+    // Set patient from prescription
+    setSelectedPatient({
+      id: prescription.patientId,
+      firstName: prescription.patientName.split(' ')[0] || '',
+      lastName: prescription.patientName.split(' ')[1] || '',
+    });
     setSelectedTab("cart");
     
     toast({
@@ -275,6 +309,17 @@ export default function ReceptionistPOS() {
       });
       return;
     }
+    
+    if (!selectedPatient) {
+      toast({
+        title: "Patient Required",
+        description: "Please select a patient before checkout",
+        variant: "destructive",
+      });
+      setShowPatientDialog(true);
+      return;
+    }
+    
     setShowPayment(true);
   };
 
@@ -293,6 +338,7 @@ export default function ReceptionistPOS() {
 
     const saleData = {
       saleType: selectedTab === "prescription" ? "prescription" : "otc",
+      patientId: selectedPatient?.id,
       items: cart.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
@@ -303,8 +349,6 @@ export default function ReceptionistPOS() {
       paymentMethod,
       amountPaid: received,
       change: paymentMethod === "cash" ? received - total : 0,
-      customerName,
-      customerPhone,
     };
 
     processSaleMutation.mutate(saleData);
@@ -468,21 +512,56 @@ export default function ReceptionistPOS() {
                 <ShoppingCart className="h-5 w-5" />
                 Shopping Cart ({cart.length})
               </span>
-              <Button variant="ghost" size="sm" onClick={() => setCart([])}>
+              <Button variant="ghost" size="sm" onClick={() => {setCart([]); setSelectedPatient(null);}}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </CardTitle>
             <CardDescription>
-              <div className="flex gap-2 mt-2">
-                <div className="relative flex-1">
-                  <User className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Customer name (optional)"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="pl-8 h-9"
-                  />
-                </div>
+              {/* Patient Selection */}
+              <div className="mt-2 space-y-2">
+                {selectedPatient ? (
+                  <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm">
+                            {selectedPatient.firstName} {selectedPatient.lastName}
+                          </p>
+                          {selectedPatient.phone && (
+                            <p className="text-xs text-muted-foreground">📞 {selectedPatient.phone}</p>
+                          )}
+                          {selectedPatient.nationalId && (
+                            <p className="text-xs text-muted-foreground">ID: {selectedPatient.nationalId}</p>
+                          )}
+                          {selectedPatient.allergies && selectedPatient.allergies.length > 0 && (
+                            <div className="mt-1">
+                              <Badge variant="destructive" className="text-xs">
+                                ⚠️ Allergies: {selectedPatient.allergies.join(', ')}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedPatient(null)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowPatientDialog(true)}
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Select Patient (Required)
+                  </Button>
+                )}
               </div>
             </CardDescription>
           </CardHeader>
@@ -686,6 +765,146 @@ export default function ReceptionistPOS() {
           <div className="p-4">
             <p className="text-muted-foreground text-center">Calculator feature coming soon...</p>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Patient Search/Registration Dialog */}
+      <Dialog open={showPatientDialog} onOpenChange={setShowPatientDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select or Register Patient</DialogTitle>
+            <DialogDescription>
+              Search for an existing patient or register a new one
+            </DialogDescription>
+          </DialogHeader>
+          <Tabs defaultValue="search" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="search">Search Patient</TabsTrigger>
+              <TabsTrigger value="register">Register New</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="search" className="space-y-4">
+              <div>
+                <Label>Search by Name, Phone, or National ID</Label>
+                <Input
+                  placeholder="Type to search..."
+                  value={patientSearchQuery}
+                  onChange={(e) => setPatientSearchQuery(e.target.value)}
+                  className="mt-2"
+                  autoFocus
+                />
+              </div>
+              
+              {patientSearchQuery.length >= 2 && (
+                <div className="space-y-2 max-h-96 overflow-auto">
+                  {patients.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No patients found</p>
+                  ) : (
+                    patients.map((patient) => (
+                      <Card 
+                        key={patient.id} 
+                        className="cursor-pointer hover:bg-accent transition-colors"
+                        onClick={() => {
+                          setSelectedPatient(patient);
+                          setShowPatientDialog(false);
+                          setPatientSearchQuery("");
+                          toast({
+                            title: "Patient Selected",
+                            description: `${patient.firstName} ${patient.lastName}`,
+                          });
+                        }}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-semibold">
+                                {patient.firstName} {patient.lastName}
+                              </p>
+                              {patient.phone && (
+                                <p className="text-sm text-muted-foreground">📞 {patient.phone}</p>
+                              )}
+                              {patient.nationalId && (
+                                <p className="text-sm text-muted-foreground">ID: {patient.nationalId}</p>
+                              )}
+                              {patient.allergies && patient.allergies.length > 0 && (
+                                <div className="mt-1">
+                                  <Badge variant="destructive" className="text-xs">
+                                    ⚠️ Allergies: {patient.allergies.join(', ')}
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                            <Badge variant="outline">Select</Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
+                  )}
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="register" className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Quick registration for walk-in customers
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>First Name *</Label>
+                  <Input placeholder="John" required />
+                </div>
+                <div>
+                  <Label>Last Name *</Label>
+                  <Input placeholder="Doe" required />
+                </div>
+                <div>
+                  <Label>National ID</Label>
+                  <Input placeholder="63-1234567X89" />
+                </div>
+                <div>
+                  <Label>Phone Number *</Label>
+                  <Input placeholder="+263 77 123 4567" required />
+                </div>
+                <div>
+                  <Label>Gender</Label>
+                  <Select>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Date of Birth</Label>
+                  <Input type="date" />
+                </div>
+                <div className="col-span-2">
+                  <Label>Email (Optional)</Label>
+                  <Input type="email" placeholder="john.doe@email.com" />
+                </div>
+                <div className="col-span-2">
+                  <Label>Address (Optional)</Label>
+                  <Textarea placeholder="Street address, city" rows={2} />
+                </div>
+                <div className="col-span-2">
+                  <Label>Known Allergies (Optional)</Label>
+                  <Input placeholder="e.g., Penicillin, Sulfa drugs" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-4">
+                <Button variant="outline" onClick={() => setShowPatientDialog(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button className="flex-1">
+                  Register & Select
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>
