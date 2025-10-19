@@ -115,14 +115,22 @@ router.post('/login', async (req: Request, res: Response) => {
       });
     }
 
-    // Create session
+    // Create session and save it before responding
     req.session.userId = user.id;
 
-    // Return user data (without password)
-    const { password: _, verificationToken: __, ...userData } = user;
-    res.json({
-      message: "Login successful",
-      user: userData,
+    // Explicitly save the session before sending response
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ message: "Error creating session" });
+      }
+
+      // Return user data (without password)
+      const { password: _, verificationToken: __, ...userData } = user;
+      res.json({
+        message: "Login successful",
+        user: userData,
+      });
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
