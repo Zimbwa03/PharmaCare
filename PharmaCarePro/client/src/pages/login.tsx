@@ -10,6 +10,7 @@ import { Pill, Mail, Lock, AlertCircle, Loader2, Shield, Briefcase, User } from 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQueryClient } from "@tanstack/react-query";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email"),
@@ -23,6 +24,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const {
     register,
@@ -54,8 +56,11 @@ export default function Login() {
         return;
       }
 
-      // Login successful - redirect to dashboard
-      setLocation("/");
+      // Login successful - invalidate auth cache and redirect to dashboard
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      // Use full page reload to ensure clean state
+      window.location.href = "/";
     } catch (err) {
       setError("Network error. Please try again.");
     } finally {

@@ -2,6 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pill, Shield, TrendingUp, Users, Package, FileText } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Landing() {
   return (
@@ -18,7 +19,7 @@ export default function Landing() {
             </div>
           </div>
           <Button asChild data-testid="button-login">
-            <a href="/login">Log In</a>
+            <Link href="/login">Log In</Link>
           </Button>
         </div>
       </header>
@@ -33,7 +34,7 @@ export default function Landing() {
             intelligent inventory management, and real-time drug interaction checking.
           </p>
           <Button size="lg" asChild data-testid="button-get-started">
-            <a href="/login">Get Started</a>
+            <Link href="/login">Get Started</Link>
           </Button>
         </div>
 
@@ -118,7 +119,7 @@ export default function Landing() {
               Join pharmacies across Zimbabwe using Pharma Care for efficient, compliant operations
             </CardDescription>
             <Button size="lg" variant="secondary" asChild data-testid="button-start-now">
-              <a href="/login">Start Now</a>
+              <Link href="/login">Start Now</Link>
             </Button>
           </CardHeader>
         </Card>

@@ -9,12 +9,12 @@ import { insertPatientSchema, insertProductSchema, insertStockMovementSchema } f
 import { checkDrugInteractions, forecastDemand } from "./ai-services";
 
 // Helper function to create audit logs
-async function auditLog(userId: string, action: string, entityType: string, entityId: string, details?: any) {
+async function auditLog(userId: string, action: 'create' | 'update' | 'delete' | 'login' | 'logout' | 'dispense' | 'stock_movement', entity: string, entityId: string, details?: any) {
   try {
     await storage.createAuditLog({
       userId,
       action,
-      entityType,
+      entity,
       entityId,
       details,
     });
@@ -133,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(validated);
       
-      await auditLog(req.dbUser.id, "CREATE", "patient", patient.id, {
+      await auditLog(req.dbUser.id, "create", "patient", patient.id, {
         patientName: `${patient.firstName} ${patient.lastName}`,
       });
       
@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = insertProductSchema.parse(req.body);
       const product = await storage.createProduct(validated);
       
-      await auditLog(req.dbUser.id, "CREATE", "product", product.id, {
+      await auditLog(req.dbUser.id, "create", "product", product.id, {
         productName: product.name,
         isControlled: product.isControlledSubstance,
       });
@@ -211,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const prescriptionOnlyProducts = selectedProducts.filter(p => p.requiresPrescription);
       
       if (controlledProducts.length > 0) {
-        await auditLog(req.dbUser.id, "DISPENSE_CONTROLLED", "prescription", "pending", {
+        await auditLog(req.dbUser.id, "dispense", "prescription", "pending", {
           patientId,
           products: controlledProducts.map(p => ({ id: p.id, name: p.name })),
         });
@@ -268,7 +268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prescriptionItems
       );
 
-      await auditLog(req.dbUser.id, "CREATE", "prescription", prescription.id, {
+      await auditLog(req.dbUser.id, "create", "prescription", prescription.id, {
         prescriptionNumber,
         patientId,
         itemCount: items.length,
@@ -319,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const quantity = validated.movementType === "grv" ? -validated.quantity : validated.quantity;
       await storage.updateInventory(validated.productId, validated.batchNumber || null, quantity);
 
-      await auditLog(req.dbUser.id, "STOCK_MOVEMENT", "inventory", validated.productId, {
+      await auditLog(req.dbUser.id, "stock_movement", "inventory", validated.productId, {
         movementType: validated.movementType,
         quantity: validated.quantity,
         batchNumber: validated.batchNumber,
@@ -364,11 +364,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Audit logs routes
   app.get("/api/audit-logs", requireAuth(), requireRole("Administrator", "Pharmacist"), async (req, res) => {
     try {
-      const { userId, action, entityType } = req.query;
+      const { userId, action, entity } = req.query;
       const logs = await storage.getAuditLogs({
         userId: userId as string,
         action: action as string,
-        entityType: entityType as string,
+        entity: entity as string,
       });
       res.json(logs);
     } catch (error) {
