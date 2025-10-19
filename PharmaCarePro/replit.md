@@ -22,7 +22,7 @@ Pharma Care is a comprehensive pharmacy management system designed specifically 
 - **Runtime:** Node.js with Express
 - **Language:** TypeScript
 - **ORM:** Drizzle ORM
-- **Database:** Supabase PostgreSQL (Neon-backed)
+- **Database:** Supabase PostgreSQL (postgres-js driver)
 - **Authentication:** Replit Auth (OIDC)
 - **Session Storage:** PostgreSQL with connect-pg-simple
 
@@ -175,6 +175,11 @@ The database includes sample data:
 - Initial inventory levels
 
 ## Recent Changes
+- **2025-10-19:** GitHub import setup in Replit environment
+  - Switched database driver from @neondatabase/serverless to postgres-js for Supabase compatibility
+  - Installed dependencies and configured development workflow
+  - Configured deployment settings for autoscale
+  - Verified application runs successfully with Supabase PostgreSQL
 - **2025-10-13:** System fully implemented and production-ready
   - Full database schema with all 11 tables
   - Complete frontend with all main pages and sidebar navigation
@@ -208,7 +213,7 @@ shared/
 - Use DeepSeek for drug interactions (NOT OpenAI)
 - Use Gemini for analytics and forecasting
 - Color scheme: White background with professional blue accent
-- Database: Supabase PostgreSQL via Transaction Pooler
+- Database: Supabase PostgreSQL (postgres-js driver, NOT Neon)
 - Authentication: Replit Auth (OIDC)
 
 ## System Status
