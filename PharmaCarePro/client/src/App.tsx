@@ -38,14 +38,10 @@ import { LogOut, User } from "lucide-react";
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  // Redirect receptionists to POS, others to dashboard
-  const getDefaultRoute = () => {
-    if (!user) return Landing;
-    if (user.role === 'receptionist') return ReceptionistPOS;
-    return Dashboard;
-  };
-
-  const DefaultComponent = getDefaultRoute();
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <Switch>
@@ -54,11 +50,13 @@ function Router() {
       <Route path="/create-admin" component={CreateAdmin} />
 
       {/* Protected routes - require authentication */}
-      {isLoading || !isAuthenticated ? (
+      {!isAuthenticated ? (
         <Route path="/" component={Landing} />
       ) : (
         <>
-          <Route path="/" component={DefaultComponent} />
+          <Route path="/">
+            {user?.role === 'receptionist' ? <ReceptionistPOS /> : <Dashboard />}
+          </Route>
           <Route path="/admin-dashboard" component={AdminDashboard} />
           <Route path="/receptionist-pos" component={ReceptionistPOS} />
           <Route path="/patients" component={Patients} />
