@@ -192,6 +192,19 @@ The database includes sample data:
 - Initial inventory levels
 
 ## Recent Changes
+- **2025-10-19:** Returns/Refunds System Implementation
+  - **Returns Tab (F10)**: Dedicated returns interface in POS for processing customer returns and refunds
+  - **Sale Search**: Search sales by sale number or patient name to locate transactions for return
+  - **Return Item Selection**: Select specific items and quantities for partial or full returns with checkbox interface
+  - **Refund Processing**: Support for multiple refund methods (Cash, Card Reversal, EcoCash, OneMoney)
+  - **Inventory Adjustment**: Returned items automatically added back to inventory stock
+  - **Shift Integration**: Cash refunds automatically deducted from active shift balance for accurate cash tracking
+  - **Sale Status Tracking**: Sales marked as 'refunded' or 'partially_refunded' after return processing
+  - **Return Reason Capture**: Required reason field for all returns for audit compliance
+  - **Auto-numbered Returns**: System generates return numbers (RET-YYYY-NNNNNN format)
+  - **Refund Validation**: Prevents duplicate refunds - checks if sale already fully refunded
+  - **Real-time Total Calculation**: Shows total refund amount before processing
+
 - **2025-10-19:** Shift Management System Implementation
   - **Shift Status Banner**: Prominent shift status indicator at top of POS showing current shift details (opening cash, transaction count, current balance)
   - **Open Shift Dialog**: Cash drawer opening with initial cash count and auto-generated shift numbers (SHIFT-YYYY-MMDD-NNN format)
