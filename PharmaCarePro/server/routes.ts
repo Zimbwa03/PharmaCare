@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { requireAuth, requireRole } from "./auth";
 import authRoutes from "./authRoutes";
+import adminRoutes from "./adminRoutes";
 import { insertPatientSchema, insertProductSchema, insertStockMovementSchema } from "@shared/schema";
 import { checkDrugInteractions, forecastDemand } from "./ai-services";
 
@@ -24,6 +25,9 @@ async function auditLog(userId: string, action: string, entityType: string, enti
 export async function registerRoutes(app: Express): Promise<Server> {
   // Custom authentication routes
   app.use('/api/auth', authRoutes);
+  
+  // Admin routes (protected - admin only)
+  app.use('/api/admin', adminRoutes);
 
   // Dashboard stats
   app.get("/api/dashboard/stats", requireAuth(), async (req, res) => {

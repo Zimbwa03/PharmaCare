@@ -13,6 +13,7 @@ import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import CreateAdmin from "@/pages/create-admin";
 import Dashboard from "@/pages/dashboard";
+import AdminDashboard from "@/pages/admin-dashboard";
 import Patients from "@/pages/patients";
 import Prescriptions from "@/pages/prescriptions";
 import Inventory from "@/pages/inventory";
@@ -48,6 +49,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/admin-dashboard" component={AdminDashboard} />
           <Route path="/patients" component={Patients} />
           <Route path="/prescriptions" component={Prescriptions} />
           <Route path="/inventory" component={Inventory} />

@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Pill, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Pill, Mail, Lock, AlertCircle, Loader2, Shield, Briefcase, User } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,6 +22,7 @@ export default function Login() {
   const [, setLocation] = useLocation();
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
   const {
     register,
@@ -61,18 +63,86 @@ export default function Login() {
     }
   };
 
+  const roleOptions = [
+    {
+      role: "administrator",
+      label: "Administrator",
+      icon: Shield,
+      description: "Full system access & management",
+      color: "bg-purple-500",
+      hoverColor: "hover:bg-purple-600",
+      borderColor: "border-purple-500",
+    },
+    {
+      role: "pharmacist",
+      label: "Pharmacist",
+      icon: Briefcase,
+      description: "Clinical operations & prescriptions",
+      color: "bg-blue-500",
+      hoverColor: "hover:bg-blue-600",
+      borderColor: "border-blue-500",
+    },
+    {
+      role: "receptionist",
+      label: "Receptionist",
+      icon: User,
+      description: "Patient registration & basic ops",
+      color: "bg-green-500",
+      hoverColor: "hover:bg-green-600",
+      borderColor: "border-green-500",
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-5xl">
         {/* Logo and Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary shadow-lg">
-              <Pill className="h-10 w-10 text-primary-foreground" />
+            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-purple-600 shadow-2xl">
+              <Pill className="h-12 w-12 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Pharma Care</h1>
-          <p className="text-gray-600 mt-2">Zimbabwe Pharmacy Management</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Pharma Care Pro</h1>
+          <p className="text-gray-600 text-lg">AI-Powered Pharmacy Management System</p>
+          <p className="text-gray-500 text-sm">Zimbabwe</p>
+        </div>
+
+        {/* Role Selection Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {roleOptions.map((option) => (
+            <div
+              key={option.role}
+              onClick={() => setSelectedRole(option.role)}
+              className={`
+                cursor-pointer transition-all duration-300 transform
+                ${selectedRole === option.role 
+                  ? `ring-4 ring-offset-2 ${option.borderColor} scale-105` 
+                  : 'hover:scale-102'
+                }
+              `}
+            >
+              <Card className={`
+                border-2 
+                ${selectedRole === option.role ? option.borderColor : 'border-gray-200'}
+                hover:shadow-xl transition-all
+              `}>
+                <CardContent className="p-6 text-center">
+                  <div className={`
+                    flex h-16 w-16 items-center justify-center rounded-xl mx-auto mb-4
+                    ${option.color} shadow-lg
+                  `}>
+                    <option.icon className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg mb-2">{option.label}</h3>
+                  <p className="text-sm text-gray-600">{option.description}</p>
+                  {selectedRole === option.role && (
+                    <Badge className="mt-3" variant="default">Selected</Badge>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ))}
         </div>
 
         {/* Login Card */}

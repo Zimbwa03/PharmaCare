@@ -9,6 +9,14 @@ import {
   TrendingUp,
   Activity,
   ClipboardList,
+  Shield,
+  Building2,
+  ArrowLeftRight,
+  AlertCircle,
+  Zap,
+  FileBarChart,
+  UserCog,
+  Bot,
 } from "lucide-react";
 import {
   Sidebar,
@@ -64,6 +72,57 @@ const mainMenuItems: MenuItem[] = [
   },
 ];
 
+const adminItems: MenuItem[] = [
+  {
+    title: "Admin Dashboard",
+    url: "/admin-dashboard",
+    icon: Shield,
+    roles: ["administrator"],
+  },
+  {
+    title: "Branch Management",
+    url: "/branch-management",
+    icon: Building2,
+    roles: ["administrator"],
+  },
+  {
+    title: "Interbranch Transfers",
+    url: "/interbranch-transfers",
+    icon: ArrowLeftRight,
+    roles: ["administrator"],
+  },
+  {
+    title: "Expired Drugs",
+    url: "/expired-drugs",
+    icon: AlertCircle,
+    roles: ["administrator"],
+  },
+  {
+    title: "Fast-Moving Drugs",
+    url: "/fast-moving-drugs",
+    icon: Zap,
+    roles: ["administrator"],
+  },
+  {
+    title: "Tax Reports",
+    url: "/tax-reports",
+    icon: FileBarChart,
+    roles: ["administrator"],
+  },
+  {
+    title: "Staff Management",
+    url: "/staff-management",
+    icon: UserCog,
+    roles: ["administrator"],
+  },
+  {
+    title: "Daily Reports Bot",
+    url: "/daily-reports-bot",
+    icon: Bot,
+    roles: ["administrator"],
+  },
+];
+
 const operationsItems: MenuItem[] = [
   {
     title: "Stock Operations",
@@ -105,6 +164,7 @@ export function AppSidebar() {
   };
 
   const filteredMainMenu = filterMenuByRole(mainMenuItems);
+  const filteredAdmin = filterMenuByRole(adminItems);
   const filteredOperations = filterMenuByRole(operationsItems);
   const filteredSystem = filterMenuByRole(systemItems);
 
@@ -130,6 +190,26 @@ export function AppSidebar() {
                 {filteredMainMenu.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase()}`}>
+                      <a href={item.url}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {filteredAdmin.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Admin Controls</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredAdmin.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase().replace(' ', '-')}`}>
                       <a href={item.url}>
                         <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
