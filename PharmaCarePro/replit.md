@@ -192,6 +192,17 @@ The database includes sample data:
 - Initial inventory levels
 
 ## Recent Changes
+- **2025-10-19:** Sales History Feature Implementation
+  - **History Tab (F11)**: Comprehensive sales transaction history viewer in POS
+  - **Advanced Filtering**: Filter sales by date range (start/end date), status (completed, refunded, partially refunded, cancelled)
+  - **Detailed Sales Table**: Shows sale number, date/time, patient, type (OTC/Prescription/Quotation), amount, status, and cashier
+  - **Sale Details Dialog**: Click "View Details" to see full transaction information including payment summary, VAT breakdown, discount, change
+  - **Quick Return Access**: Direct link from sales history to process returns - "Process Return" button switches to Returns tab with sale pre-loaded
+  - **Real-time Data**: Automatically updates when new sales are processed or returns are completed
+  - **Clear Filters**: One-click button to reset all filters and view all sales
+  - **Status Badges**: Color-coded badges for easy visual identification (completed=default, refunded=red, partial return=secondary)
+  - **Cashier Tracking**: Shows which staff member processed each transaction for accountability
+
 - **2025-10-19:** Returns/Refunds System Implementation
   - **Returns Tab (F10)**: Dedicated returns interface in POS for processing customer returns and refunds
   - **Sale Search**: Search sales by sale number or patient name to locate transactions for return
