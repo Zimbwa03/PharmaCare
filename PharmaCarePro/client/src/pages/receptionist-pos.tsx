@@ -126,6 +126,11 @@ export default function ReceptionistPOS() {
   const [quotationCart, setQuotationCart] = useState<CartItem[]>([]);
   const [quotationNotes, setQuotationNotes] = useState("");
   const [quotationValidDays, setQuotationValidDays] = useState(7);
+  const [showOpenShiftDialog, setShowOpenShiftDialog] = useState(false);
+  const [showCloseShiftDialog, setShowCloseShiftDialog] = useState(false);
+  const [openingCash, setOpeningCash] = useState("");
+  const [closingCash, setClosingCash] = useState("");
+  const [shiftNotes, setShiftNotes] = useState("");
 
   // Fetch pending prescriptions
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
@@ -157,6 +162,20 @@ export default function ReceptionistPOS() {
       if (!response.ok) throw new Error("Failed to fetch quotations");
       return response.json();
     },
+  });
+
+  // Fetch current shift
+  const { data: currentShift, isLoading: isLoadingShift } = useQuery({
+    queryKey: ["/api/receptionist/shift/current"],
+    queryFn: async () => {
+      const response = await fetch("/api/receptionist/shift/current");
+      if (!response.ok) {
+        if (response.status === 404) return null; // No active shift
+        throw new Error("Failed to fetch current shift");
+      }
+      return response.json();
+    },
+    retry: false,
   });
 
   // Search products for OTC sales (STRICT: receptionist-only endpoint)
@@ -223,6 +242,65 @@ export default function ReceptionistPOS() {
       setQuotationValidDays(7);
       setShowQuotationDialog(false);
       queryClient.invalidateQueries({ queryKey: ["/api/receptionist/quotations"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Open shift mutation
+  const openShiftMutation = useMutation({
+    mutationFn: async (openingCash: string) => {
+      const response = await fetch("/api/receptionist/shift/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openingCash }),
+      });
+      if (!response.ok) throw new Error("Failed to open shift");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Shift Opened",
+        description: `Shift ${data.shift.shiftNumber} started successfully!`,
+      });
+      setOpeningCash("");
+      setShowOpenShiftDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/receptionist/shift/current"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Close shift mutation
+  const closeShiftMutation = useMutation({
+    mutationFn: async (data: { closingCash: string; notes?: string }) => {
+      const response = await fetch("/api/receptionist/shift/close", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error("Failed to close shift");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Shift Closed",
+        description: `Shift closed. Variance: $${data.closure.variance}`,
+      });
+      setClosingCash("");
+      setShiftNotes("");
+      setShowCloseShiftDialog(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/receptionist/shift/current"] });
     },
     onError: (error: Error) => {
       toast({
@@ -402,10 +480,66 @@ export default function ReceptionistPOS() {
   const change = paymentMethod === "cash" ? parseFloat(amountReceived || "0") - total : 0;
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex gap-4">
-      {/* Left Section - Product Selection */}
-      <div className="flex-1 flex flex-col gap-4">
-        <Card>
+    <div className="h-[calc(100vh-8rem)] flex flex-col gap-4">
+      {/* Shift Status Banner */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950 border-blue-200 dark:border-blue-800">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            {currentShift ? (
+              <>
+                <div className="flex items-center gap-4">
+                  <Badge className="bg-green-600 hover:bg-green-700">
+                    ✓ Shift Open
+                  </Badge>
+                  <div className="text-sm">
+                    <span className="font-semibold">{currentShift.shiftNumber}</span>
+                    <span className="text-muted-foreground ml-3">
+                      Opening: ${parseFloat(currentShift.openingCash).toFixed(2)}
+                    </span>
+                    <span className="text-muted-foreground ml-3">
+                      Sales: {currentShift.transactionCount || 0}
+                    </span>
+                    <span className="text-muted-foreground ml-3">
+                      Current: ${parseFloat(currentShift.currentCash || currentShift.openingCash).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => setShowCloseShiftDialog(true)}
+                >
+                  Close Shift
+                </Button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-4">
+                  <Badge variant="destructive">
+                    ✗ No Active Shift
+                  </Badge>
+                  <p className="text-sm text-muted-foreground">
+                    Open a shift to start processing sales
+                  </p>
+                </div>
+                <Button 
+                  className="bg-green-600 hover:bg-green-700"
+                  size="sm"
+                  onClick={() => setShowOpenShiftDialog(true)}
+                >
+                  Open Shift
+                </Button>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main POS Content */}
+      <div className="flex-1 flex gap-4">
+        {/* Left Section - Product Selection */}
+        <div className="flex-1 flex flex-col gap-4">
+          <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between">
               <span className="flex items-center gap-2">
@@ -898,6 +1032,163 @@ export default function ReceptionistPOS() {
         </DialogContent>
       </Dialog>
 
+      {/* Open Shift Dialog */}
+      <Dialog open={showOpenShiftDialog} onOpenChange={setShowOpenShiftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open Shift</DialogTitle>
+            <DialogDescription>
+              Count your opening cash float and start your shift
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Opening Cash Amount ($)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={openingCash}
+                onChange={(e) => setOpeningCash(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Count the cash in your drawer before starting
+              </p>
+            </div>
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowOpenShiftDialog(false);
+                  setOpeningCash("");
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                disabled={!openingCash || parseFloat(openingCash) < 0 || openShiftMutation.isPending}
+                onClick={() => openShiftMutation.mutate(openingCash)}
+              >
+                {openShiftMutation.isPending ? "Opening..." : "Open Shift"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Shift Dialog */}
+      <Dialog open={showCloseShiftDialog} onOpenChange={setShowCloseShiftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Close Shift</DialogTitle>
+            <DialogDescription>
+              Count your cash drawer and close your shift
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {currentShift && (
+              <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                <CardContent className="p-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Opening Cash:</span>
+                    <span className="font-semibold">${parseFloat(currentShift.openingCash).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Total Sales:</span>
+                    <span className="font-semibold">${parseFloat(currentShift.totalSales || "0").toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Transactions:</span>
+                    <span className="font-semibold">{currentShift.transactionCount || 0}</span>
+                  </div>
+                  <div className="flex justify-between text-sm border-t pt-2">
+                    <span className="text-muted-foreground">Expected Cash:</span>
+                    <span className="font-bold text-lg">
+                      ${(parseFloat(currentShift.openingCash) + parseFloat(currentShift.totalSales || "0")).toFixed(2)}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div>
+              <Label>Counted Cash in Drawer ($)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={closingCash}
+                onChange={(e) => setClosingCash(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            {closingCash && currentShift && (
+              <Card className={
+                parseFloat(closingCash) === parseFloat(currentShift.openingCash) + parseFloat(currentShift.totalSales || "0")
+                  ? "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800"
+                  : "bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800"
+              }>
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-semibold">
+                      {parseFloat(closingCash) === parseFloat(currentShift.openingCash) + parseFloat(currentShift.totalSales || "0")
+                        ? "✓ Cash Balanced"
+                        : "⚠ Cash Variance"}
+                    </span>
+                    <span className="text-lg font-bold">
+                      ${(parseFloat(closingCash) - parseFloat(currentShift.openingCash) - parseFloat(currentShift.totalSales || "0")).toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {parseFloat(closingCash) > parseFloat(currentShift.openingCash) + parseFloat(currentShift.totalSales || "0")
+                      ? "Cash Over - You have more than expected"
+                      : parseFloat(closingCash) < parseFloat(currentShift.openingCash) + parseFloat(currentShift.totalSales || "0")
+                      ? "Cash Short - You have less than expected"
+                      : "Perfect! Cash matches expected amount"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            <div>
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                placeholder="Any notes or explanations for variance..."
+                value={shiftNotes}
+                onChange={(e) => setShiftNotes(e.target.value)}
+                rows={2}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCloseShiftDialog(false);
+                  setClosingCash("");
+                  setShiftNotes("");
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                disabled={!closingCash || parseFloat(closingCash) < 0 || closeShiftMutation.isPending}
+                onClick={() => closeShiftMutation.mutate({ closingCash, notes: shiftNotes })}
+              >
+                {closeShiftMutation.isPending ? "Closing..." : "Close Shift"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Patient Search/Registration Dialog */}
       <Dialog open={showPatientDialog} onOpenChange={setShowPatientDialog}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -1289,6 +1580,7 @@ export default function ReceptionistPOS() {
           </div>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
