@@ -128,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/patients", requireAuth(), requireRole("Administrator", "Pharmacist"), async (req: any, res) => {
+  app.post("/api/patients", requireAuth(), requireRole("Administrator", "Pharmacist", "Receptionist"), async (req: any, res) => {
     try {
       const validated = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(validated);
