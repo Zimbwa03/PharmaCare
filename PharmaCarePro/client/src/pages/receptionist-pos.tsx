@@ -1146,12 +1146,11 @@ export default function ReceptionistPOS() {
                     </div>
                     <div className="flex-1">
                       <Label>Status</Label>
-                      <Select value={historyStatus} onValueChange={setHistoryStatus}>
+                      <Select value={historyStatus || undefined} onValueChange={(value) => setHistoryStatus(value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">All Statuses</SelectItem>
                           <SelectItem value="completed">Completed</SelectItem>
                           <SelectItem value="refunded">Refunded</SelectItem>
                           <SelectItem value="partially_refunded">Partially Refunded</SelectItem>
