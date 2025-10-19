@@ -53,23 +53,21 @@ export default function Login() {
         } else {
           setError(result.message || "Login failed");
         }
+        setIsLoading(false);
         return;
       }
 
-      // Login successful - redirect based on user role
-      // Give browser time to set cookie, then do full reload
-      setTimeout(() => {
-        if (result.user?.role === 'receptionist') {
-          window.location.href = "/receptionist-pos";
-        } else if (result.user?.role === 'administrator') {
-          window.location.href = "/admin-dashboard";
-        } else {
-          window.location.href = "/";
-        }
-      }, 100);
+      // Login successful - redirect based on user role immediately
+      if (result.user?.role === 'receptionist') {
+        window.location.href = "/receptionist-pos";
+      } else if (result.user?.role === 'administrator') {
+        window.location.href = "/admin-dashboard";
+      } else {
+        window.location.href = "/";
+      }
+      // Don't set isLoading to false - we're redirecting
     } catch (err) {
       setError("Network error. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };
