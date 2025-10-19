@@ -36,7 +36,16 @@ import {
 import { LogOut, User } from "lucide-react";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  // Redirect receptionists to POS, others to dashboard
+  const getDefaultRoute = () => {
+    if (!user) return Landing;
+    if (user.role === 'receptionist') return ReceptionistPOS;
+    return Dashboard;
+  };
+
+  const DefaultComponent = getDefaultRoute();
 
   return (
     <Switch>
@@ -49,7 +58,7 @@ function Router() {
         <Route path="/" component={Landing} />
       ) : (
         <>
-          <Route path="/" component={Dashboard} />
+          <Route path="/" component={DefaultComponent} />
           <Route path="/admin-dashboard" component={AdminDashboard} />
           <Route path="/receptionist-pos" component={ReceptionistPOS} />
           <Route path="/patients" component={Patients} />
