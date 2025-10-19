@@ -26,7 +26,7 @@ export const sessions = pgTable(
 );
 
 // User roles enum
-export const userRoleEnum = pgEnum('user_role', ['administrator', 'pharmacist', 'technician', 'store_manager']);
+export const userRoleEnum = pgEnum('user_role', ['administrator', 'pharmacist', 'receptionist', 'technician', 'store_manager']);
 
 // User storage table - Required for Replit Auth with roles
 export const users = pgTable("users", {
@@ -35,7 +35,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  role: userRoleEnum("role").notNull().default('technician'),
+  role: userRoleEnum("role").notNull().default('receptionist'),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -22,63 +22,91 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 
-const mainMenuItems = [
+type MenuItem = {
+  title: string;
+  url: string;
+  icon: any;
+  roles?: string[];
+};
+
+const mainMenuItems: MenuItem[] = [
   {
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
+    roles: ["administrator", "pharmacist", "receptionist", "technician", "store_manager"],
   },
   {
     title: "Patients",
     url: "/patients",
     icon: Users,
+    roles: ["administrator", "pharmacist", "receptionist"],
   },
   {
     title: "Prescriptions",
     url: "/prescriptions",
     icon: Pill,
+    roles: ["administrator", "pharmacist"],
   },
   {
     title: "Inventory",
     url: "/inventory",
     icon: Package,
+    roles: ["administrator", "pharmacist", "technician", "store_manager"],
   },
   {
     title: "Products",
     url: "/products",
     icon: ClipboardList,
+    roles: ["administrator", "store_manager", "technician"],
   },
 ];
 
-const operationsItems = [
+const operationsItems: MenuItem[] = [
   {
     title: "Stock Operations",
     url: "/stock-operations",
     icon: Activity,
+    roles: ["administrator", "pharmacist", "technician", "store_manager"],
   },
   {
     title: "Reports",
     url: "/reports",
     icon: FileText,
+    roles: ["administrator", "store_manager"],
   },
   {
     title: "Analytics",
     url: "/analytics",
     icon: TrendingUp,
+    roles: ["administrator", "store_manager"],
   },
 ];
 
-const systemItems = [
+const systemItems: MenuItem[] = [
   {
     title: "Settings",
     url: "/settings",
     icon: Settings,
+    roles: ["administrator", "pharmacist"],
   },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user, isLoading } = useAuth();
+
+  const filterMenuByRole = (items: MenuItem[]) => {
+    // Don't show any menu items if user role is not yet known (security)
+    if (!user?.role) return [];
+    return items.filter(item => !item.roles || item.roles.includes(user.role));
+  };
+
+  const filteredMainMenu = filterMenuByRole(mainMenuItems);
+  const filteredOperations = filterMenuByRole(operationsItems);
+  const filteredSystem = filterMenuByRole(systemItems);
 
   return (
     <Sidebar>
@@ -94,59 +122,65 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mainMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase()}`}>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {filteredMainMenu.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredMainMenu.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase()}`}>
+                      <a href={item.url}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Operations</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {operationsItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase().replace(' ', '-')}`}>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {filteredOperations.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Operations</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredOperations.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase().replace(' ', '-')}`}>
+                      <a href={item.url}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup>
-          <SidebarGroupLabel>System</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {systemItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase()}`}>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {filteredSystem.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>System</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {filteredSystem.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild isActive={location === item.url} data-testid={`nav-${item.title.toLowerCase()}`}>
+                      <a href={item.url}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
     </Sidebar>
   );

@@ -175,11 +175,15 @@ The database includes sample data:
 - Initial inventory levels
 
 ## Recent Changes
-- **2025-10-19:** GitHub import setup in Replit environment
+- **2025-10-19:** GitHub import setup and role-based navigation implementation
   - Switched database driver from @neondatabase/serverless to postgres-js for Supabase compatibility
   - Installed dependencies and configured development workflow
   - Configured deployment settings for autoscale
-  - Verified application runs successfully with Supabase PostgreSQL
+  - **Added 'receptionist' role** to user_role enum (now: administrator, pharmacist, receptionist, technician, store_manager)
+  - **Implemented role-based sidebar navigation** - each user sees only their permitted tabs
+  - **Pharmacist role access**: Dashboard, Patients, Prescriptions, Inventory, Stock Operations, Settings
+  - **Security fix**: Sidebar shows no navigation links until user role is authenticated
+  - Changed default user role to 'receptionist' for new users
 - **2025-10-13:** System fully implemented and production-ready
   - Full database schema with all 11 tables
   - Complete frontend with all main pages and sidebar navigation
