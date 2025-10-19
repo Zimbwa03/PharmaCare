@@ -34,7 +34,7 @@ Pharma Care is a comprehensive pharmacy management system designed specifically 
 
 ### Database Schema
 The system uses PostgreSQL with the following main tables:
-- `users` - User accounts with role-based access (Administrator, Pharmacist, Technician, Store Manager)
+- `users` - User accounts with role-based access (Administrator, Pharmacist, Receptionist, Technician, Store Manager)
 - `patients` - Patient profiles with medical history, allergies, chronic conditions
 - `suppliers` - Supplier information
 - `manufacturers` - Drug manufacturer details
@@ -43,6 +43,11 @@ The system uses PostgreSQL with the following main tables:
 - `stock_movements` - Audit trail of all stock operations (GRN, GRV, IBT)
 - `prescriptions` - Prescription records
 - `prescription_items` - Individual items in prescriptions
+- `sales` - Sales transactions from POS
+- `sale_items` - Individual items in sales
+- `quotations` - Customer quotations with validity periods
+- `quotation_items` - Individual items in quotations
+- `shifts` - Receptionist cash drawer shifts with opening/closing balances
 - `audit_logs` - System activity audit trail
 - `sessions` - Secure session storage for authentication
 
@@ -77,6 +82,18 @@ The system uses PostgreSQL with the following main tables:
 - Sales trend analysis
 - Stock optimization recommendations
 - Patient adherence risk identification
+
+#### 6. Receptionist POS System
+- Full-featured point-of-sale interface optimized for reception staff
+- Patient search and quick registration with medical history capture
+- OTC sales and prescription dispensing workflows
+- Quotation system with auto-generated quotation numbers (QUO-YYYY-NNNN format)
+- One-click quotation-to-sale conversion
+- Shift management with cash drawer tracking and variance calculation
+- Real-time shift status monitoring
+- Multi-payment method support (Cash, Card, Mobile Money, Insurance)
+- Complete medical information capture for all transactions (allergies, chronic conditions)
+- Prominent allergy warnings and drug interaction alerts
 
 ## Design System
 
@@ -175,6 +192,17 @@ The database includes sample data:
 - Initial inventory levels
 
 ## Recent Changes
+- **2025-10-19:** Shift Management System Implementation
+  - **Shift Status Banner**: Prominent shift status indicator at top of POS showing current shift details (opening cash, transaction count, current balance)
+  - **Open Shift Dialog**: Cash drawer opening with initial cash count and auto-generated shift numbers (SHIFT-YYYY-MMDD-NNN format)
+  - **Close Shift Dialog**: End-of-day cash reconciliation with variance calculation and cash over/short alerts
+  - **Shift Enforcement**: Prevents sales processing when no active shift is open (compliance requirement)
+  - **Automatic Sales Linking**: All POS transactions automatically linked to active shift for cash accountability
+  - **Variance Tracking**: Real-time expected vs actual cash calculation with visual indicators (green=balanced, yellow=variance)
+  - **Quotations System**: Full quotation management with auto-numbered quotations (QUO-YYYY-NNNN), validity periods (7-90 days), and one-click convert-to-sale
+  - **Patient-First POS**: Every customer captured as patient with complete medical information (allergies, chronic conditions) for regulatory compliance
+  - **Medical Safety Features**: Prominent allergy warnings and chronic condition display in POS cart
+
 - **2025-10-19:** GitHub import setup and role-based navigation implementation
   - Switched database driver from @neondatabase/serverless to postgres-js for Supabase compatibility
   - Installed dependencies and configured development workflow
